@@ -1,207 +1,171 @@
-# ===================== BURGER COST WEB APP (FLASK - FIXED UI) =====================
+# ===================== KIKO'S BURGUER - COST MANAGER =====================
 from flask import Flask, request, redirect, render_template_string
 import sqlite3
 from decimal import Decimal
 
 app = Flask(__name__)
 
-# ===================== DATABASE =====================
+# ===================== DATABASE SETUP =====================
 
 def get_db():
-    conn = sqlite3.connect("burger.db")
+    conn = sqlite3.connect("burger_kiko.db")
     conn.row_factory = sqlite3.Row
     return conn
-
 
 def init_db():
     conn = get_db()
     cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS ingredientes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT,
-        precio REAL,
-        unidad TEXT
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS productos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT,
-        packaging REAL,
-        delivery REAL
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS producto_ingrediente (
-        producto_id INTEGER,
-        ingrediente_id INTEGER,
-        cantidad REAL
-    )
-    """)
-
+    cur.execute("CREATE TABLE IF NOT EXISTS ingredientes (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, precio REAL, unidad TEXT)")
+    cur.execute("CREATE TABLE IF NOT EXISTS productos (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, packaging REAL, delivery REAL)")
+    cur.execute("CREATE TABLE IF NOT EXISTS producto_ingrediente (producto_id INTEGER, ingrediente_id INTEGER, cantidad REAL)")
     conn.commit()
     conn.close()
 
 init_db()
 
-# ===================== HELPERS =====================
+# ===================== CALCULATIONS =====================
 
-def normalize_key(k):
-    return str(k).strip().lower()
-
-# ===================== LOGIC =====================
-
-def calcular_costo(producto_id):
+def obtener_costos_todos():
     conn = get_db()
     cur = conn.cursor()
-
-    cur.execute("SELECT packaging, delivery FROM productos WHERE id=?", (producto_id,))
-    row = cur.fetchone()
-    if not row:
-        return 0, 0
-
-    packaging, delivery = row
-
-    cur.execute("""
-    SELECT pi.cantidad, i.precio
-    FROM producto_ingrediente pi
-    JOIN ingredientes i ON pi.ingrediente_id = i.id
-    WHERE pi.producto_id=?
-    """, (producto_id,))
-
-    costo_base = Decimal(0)
-
-    for cantidad, precio in cur.fetchall():
-        costo_base += Decimal(str(cantidad)) * Decimal(str(precio))
-
-    costo_total = costo_base + Decimal(str(packaging)) + Decimal(str(delivery))
-
+    cur.execute("SELECT * FROM productos")
+    prods = cur.fetchall()
+    
+    resultados = []
+    for p in prods:
+        cur.execute("""
+            SELECT pi.cantidad, i.precio 
+            FROM producto_ingrediente pi 
+            JOIN ingredientes i ON pi.ingrediente_id = i.id 
+            WHERE pi.producto_id=?""", (p['id'],))
+        
+        costo_ingredientes = sum(Decimal(str(r[0])) * Decimal(str(r[1])) for r in cur.fetchall())
+        total = costo_ingredientes + Decimal(str(p['packaging'])) + Decimal(str(p['delivery']))
+        
+        resultados.append({
+            'id': p['id'],
+            'nombre': p['nombre'],
+            'costo_base': float(costo_ingredientes),
+            'total': float(total)
+        })
     conn.close()
-    return float(costo_base), float(costo_total)
+    return resultados
 
-
-def simular_produccion(stock, req, productos):
-    x = {p: 0 for p in productos}
-    stock_restante = {normalize_key(k): v for k, v in stock.items()}
-
-    while True:
-        progreso = False
-
-        for p in productos:
-            puede = True
-            for ing, cant in req[p].items():
-                if stock_restante.get(normalize_key(ing), 0) < cant:
-                    puede = False
-                    break
-
-            if puede:
-                x[p] += 1
-                progreso = True
-                for ing, cant in req[p].items():
-                    key = normalize_key(ing)
-                    stock_restante[key] -= cant
-
-        if not progreso:
-            break
-
-    return x, stock_restante
-
-# ===================== TEMPLATE =====================
+# ===================== MODERN UI TEMPLATE =====================
 
 TEMPLATE = """
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-<meta charset='UTF-8'>
-<title>Burger Cost App</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiko's Burguer Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
+        .navbar { background: #e63946; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .card { border: none; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .card-header { background: #fff; border-bottom: 1px solid #eee; border-radius: 15px 15px 0 0 !important; font-weight: bold; color: #e63946; }
+        .btn-primary { background: #e63946; border: none; }
+        .btn-primary:hover { background: #c12a36; }
+        .badge-cost { font-size: 1rem; background: #ffb703; color: #000; }
+        .table-hover tbody tr:hover { background-color: #fffdf0; }
+    </style>
 </head>
-<body class='bg-light'>
+<body>
 
-<div class='container py-4'>
-<h1 class='mb-4'>🍔 Burger Cost App</h1>
+<nav class="navbar navbar-dark mb-4">
+    <div class="container text-center">
+        <a class="navbar-brand mx-auto" href="#">🍔 KIKO'S BURGUER - CONTROL DE COSTOS</a>
+    </div>
+</nav>
 
-<div class='row'>
+<div class="container">
+    <div class="row">
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-egg-fried"></i> Nuevo Ingrediente</div>
+                <div class="card-body">
+                    <form method="post" action="/add_ing">
+                        <input class="form-control mb-2" name="nombre" placeholder="Nombre (ej: Medallón Carne)" required>
+                        <div class="input-group mb-2">
+                            <span class="input-group-text">$</span>
+                            <input class="form-control" name="precio" placeholder="Precio" type="number" step="0.01" required>
+                        </div>
+                        <input class="form-control mb-3" name="unidad" placeholder="Unidad (ej: gramos, unidad)">
+                        <button class="btn btn-primary w-100">Guardar Ingrediente</button>
+                    </form>
+                </div>
+            </div>
 
-<div class='col-md-4'>
-<div class='card p-3 mb-3'>
-<h5>Agregar Ingrediente</h5>
-<form method='post' action='/add_ing'>
-<input class='form-control mb-2' name='nombre' placeholder='Nombre' required>
-<input class='form-control mb-2' name='precio' placeholder='Precio' type='number' step='0.01' required>
-<input class='form-control mb-2' name='unidad' placeholder='Unidad'>
-<button class='btn btn-primary w-100'>Agregar</button>
-</form>
-</div>
+            <div class="card">
+                <div class="card-header">Despensa de Precios</div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        {% for i in ingredientes %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ i.nombre }}
+                            <span class="text-muted">${{ i.precio }} / {{ i.unidad }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
 
-<div class='card p-3'>
-<h5>Ingredientes</h5>
-<ul class='list-group'>
-{% for i in ingredientes %}
-<li class='list-group-item'>{{ i.id }} - {{ i.nombre }} (${{ i.precio }})</li>
-{% endfor %}
-</ul>
-</div>
-</div>
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-plus-circle"></i> Crear Nueva Hamburguesa</div>
+                <div class="card-body">
+                    <form method="post" action="/add_prod">
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <input class="form-control" name="nombre" placeholder="Nombre de la Hamburguesa" required>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <input class="form-control" name="packaging" placeholder="Packaging $" type="number" step="0.01">
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <input class="form-control" name="delivery" placeholder="Delivery $" type="number" step="0.01">
+                            </div>
+                        </div>
+                        <div class="bg-light p-3 rounded mb-3">
+                            <small class="text-muted d-block mb-2">Ingredientes (ID=Cantidad, ej: 1=150):</small>
+                            <input class="form-control" name="ingredientes" placeholder="Ej: 1=1, 2=0.5" required>
+                        </div>
+                        <button class="btn btn-success w-100">Registrar en Menú</button>
+                    </form>
+                </div>
+            </div>
 
-<div class='col-md-4'>
-<div class='card p-3 mb-3'>
-<h5>Crear Hamburguesa</h5>
-<form method='post' action='/add_prod'>
-<input class='form-control mb-2' name='nombre' placeholder='Nombre' required>
-<input class='form-control mb-2' name='packaging' placeholder='Packaging' type='number' step='0.01' required>
-<input class='form-control mb-2' name='delivery' placeholder='Delivery' type='number' step='0.01' required>
-<input class='form-control mb-2' name='ingredientes' placeholder='Ej: 1=150,2=1' required>
-<button class='btn btn-success w-100'>Crear</button>
-</form>
-</div>
-
-<div class='card p-3'>
-<h5>Hamburguesas</h5>
-<ul class='list-group'>
-{% for p in productos %}
-<li class='list-group-item d-flex justify-content-between'>
-{{ p.nombre }}
-<a class='btn btn-sm btn-outline-primary' href='/cost/{{ p.id }}'>Costo</a>
-</li>
-{% endfor %}
-</ul>
-</div>
-</div>
-
-<div class='col-md-4'>
-<div class='card p-3'>
-<h5>Simulador</h5>
-<form method='post' action='/sim'>
-<input class='form-control mb-2' name='stock' placeholder='Ej: 1=5000,2=20' required>
-<button class='btn btn-dark w-100'>Simular</button>
-</form>
-
-{% if resultado %}
-<hr>
-<h6>Resultado</h6>
-<ul class='list-group'>
-{% for k, v in resultado.items() %}
-<li class='list-group-item'>Producto {{ k }}: {{ v }}</li>
-{% endfor %}
-</ul>
-
-<h6 class='mt-3'>Stock restante</h6>
-<ul class='list-group'>
-{% for k, v in restante.items() %}
-<li class='list-group-item'>Ingrediente {{ k }}: {{ v }}</li>
-{% endfor %}
-</ul>
-{% endif %}
-
-</div>
-</div>
-
-</div>
+            <div class="card">
+                <div class="card-header">Listado de Costos de Venta</div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Producto</th>
+                                <th>Costo Ingredientes</th>
+                                <th>Costo Final (c/Pack)</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in costos %}
+                            <tr>
+                                <td class="fw-bold">{{ p.nombre }}</td>
+                                <td>${{ "%.2f"|format(p.costo_base) }}</td>
+                                <td><span class="badge badge-cost">${{ "%.2f"|format(p.total) }}</span></td>
+                                <td><button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 </body>
@@ -214,17 +178,15 @@ TEMPLATE = """
 def index():
     conn = get_db()
     ingredientes = conn.execute("SELECT * FROM ingredientes").fetchall()
-    productos = conn.execute("SELECT * FROM productos").fetchall()
+    costos = obtener_costos_todos()
     conn.close()
-    return render_template_string(TEMPLATE, ingredientes=ingredientes, productos=productos, resultado=None, restante=None)
+    return render_template_string(TEMPLATE, ingredientes=ingredientes, costos=costos)
 
 @app.route('/add_ing', methods=['POST'])
 def add_ing():
     conn = get_db()
-    conn.execute(
-        "INSERT INTO ingredientes (nombre, precio, unidad) VALUES (?, ?, ?)",
-        (request.form['nombre'], float(request.form['precio']), request.form['unidad'])
-    )
+    conn.execute("INSERT INTO ingredientes (nombre, precio, unidad) VALUES (?, ?, ?)",
+        (request.form['nombre'], float(request.form['precio']), request.form['unidad']))
     conn.commit()
     conn.close()
     return redirect('/')
@@ -233,54 +195,16 @@ def add_ing():
 def add_prod():
     conn = get_db()
     cur = conn.cursor()
-
-    cur.execute(
-        "INSERT INTO productos (nombre, packaging, delivery) VALUES (?, ?, ?)",
-        (request.form['nombre'], float(request.form['packaging']), float(request.form['delivery']))
-    )
-
+    cur.execute("INSERT INTO productos (nombre, packaging, delivery) VALUES (?, ?, ?)",
+        (request.form['nombre'], float(request.form['packaging'] or 0), float(request.form['delivery'] or 0)))
     pid = cur.lastrowid
-
     for item in request.form['ingredientes'].split(','):
-        i, c = item.split('=')
-        cur.execute("INSERT INTO producto_ingrediente VALUES (?, ?, ?)", (pid, int(i), float(c)))
-
+        if '=' in item:
+            i, c = item.split('=')
+            cur.execute("INSERT INTO producto_ingrediente VALUES (?, ?, ?)", (pid, int(i), float(c)))
     conn.commit()
     conn.close()
     return redirect('/')
-
-@app.route('/cost/<int:pid>')
-def cost(pid):
-    base, total = calcular_costo(pid)
-    return f"<h3>Costo base: {base:.2f}</h3><h3>Total: {total:.2f}</h3><a href='/'>Volver</a>"
-
-@app.route('/sim', methods=['POST'])
-def sim():
-    conn = get_db()
-
-    stock = {}
-    for item in request.form['stock'].split(','):
-        k, v = item.split('=')
-        stock[normalize_key(k)] = float(v)
-
-    productos = {}
-
-    for p in conn.execute("SELECT id FROM productos"):
-        productos[p['id']] = {}
-
-    for row in conn.execute("SELECT * FROM producto_ingrediente"):
-        productos[row['producto_id']][normalize_key(row['ingrediente_id'])] = row['cantidad']
-
-    result, restante = simular_produccion(stock, productos, list(productos.keys()))
-
-    ingredientes = conn.execute("SELECT * FROM ingredientes").fetchall()
-    productos_db = conn.execute("SELECT * FROM productos").fetchall()
-
-    conn.close()
-
-    return render_template_string(TEMPLATE, ingredientes=ingredientes, productos=productos_db, resultado=result, restante=restante)
-
-# ===================== RUN =====================
 
 if __name__ == '__main__':
     app.run(debug=True)
