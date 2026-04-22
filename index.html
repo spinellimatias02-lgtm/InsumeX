@@ -1,83 +1,97 @@
-# ===================== KIKO'S BURGUER - COST MANAGER =====================
-from flask import Flask, request, redirect, render_template_string
-import sqlite3
-from decimal import Decimal
-
-app = Flask(__name__)
-
-# ===================== DATABASE SETUP =====================
-
-def get_db():
-    conn = sqlite3.connect("burger_kiko.db")
-    conn.row_factory = sqlite3.Row
-    return conn
-
-def init_db():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("CREATE TABLE IF NOT EXISTS ingredientes (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, precio REAL, unidad TEXT)")
-    cur.execute("CREATE TABLE IF NOT EXISTS productos (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT, packaging REAL, delivery REAL)")
-    cur.execute("CREATE TABLE IF NOT EXISTS producto_ingrediente (producto_id INTEGER, ingrediente_id INTEGER, cantidad REAL)")
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# ===================== CALCULATIONS =====================
-
-def obtener_costos_todos():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM productos")
-    prods = cur.fetchall()
-    
-    resultados = []
-    for p in prods:
-        cur.execute("""
-            SELECT pi.cantidad, i.precio 
-            FROM producto_ingrediente pi 
-            JOIN ingredientes i ON pi.ingrediente_id = i.id 
-            WHERE pi.producto_id=?""", (p['id'],))
-        
-        costo_ingredientes = sum(Decimal(str(r[0])) * Decimal(str(r[1])) for r in cur.fetchall())
-        total = costo_ingredientes + Decimal(str(p['packaging'])) + Decimal(str(p['delivery']))
-        
-        resultados.append({
-            'id': p['id'],
-            'nombre': p['nombre'],
-            'costo_base': float(costo_ingredientes),
-            'total': float(total)
-        })
-    conn.close()
-    return resultados
-
-# ===================== MODERN UI TEMPLATE =====================
-
-TEMPLATE = """
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kiko's Burguer Admin</title>
+    <title>Kiko's Burguer - Admin Pro</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
-        body { background-color: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
-        .navbar { background: #e63946; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .card { border: none; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .card-header { background: #fff; border-bottom: 1px solid #eee; border-radius: 15px 15px 0 0 !important; font-weight: bold; color: #e63946; }
-        .btn-primary { background: #e63946; border: none; }
-        .btn-primary:hover { background: #c12a36; }
-        .badge-cost { font-size: 1rem; background: #ffb703; color: #000; }
-        .table-hover tbody tr:hover { background-color: #fffdf0; }
+        :root {
+            --kiko-neon-red: #ff003c;
+            --kiko-neon-yellow: #ffbd00;
+            --glass-bg: rgba(255, 255, 255, 0.85);
+        }
+
+        body {
+            /* Fondo de hamburguesa realista */
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), 
+                        url('https://images.unsplash.com/photo-1571091718767-18b5b1457add?q=80&w=2072&auto=format&fit=crop');
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: var(--kiko-neon-red) !important;
+            box-shadow: 0 4px 15px rgba(255, 0, 60, 0.4);
+            border-radius: 0 0 25px 25px;
+        }
+
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: none;
+            border-radius: 30px; /* Bordes muy redondeados */
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            margin-bottom: 25px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: var(--kiko-neon-yellow) !important;
+            color: #000;
+            font-weight: 900;
+            text-transform: uppercase;
+            text-align: center;
+            border: none;
+            padding: 15px;
+        }
+
+        .btn-kiko {
+            background: var(--kiko-neon-red);
+            color: white;
+            border-radius: 50px;
+            font-weight: bold;
+            padding: 12px;
+            transition: 0.3s;
+            border: none;
+            text-transform: uppercase;
+        }
+
+        .btn-kiko:hover {
+            background: #ff4d6d;
+            transform: scale(1.05);
+            color: white;
+        }
+
+        .table { background: transparent; }
+        .badge-price {
+            background: #2ecc71;
+            font-size: 1.1rem;
+            border-radius: 10px;
+            padding: 8px 12px;
+        }
+
+        input.form-control {
+            border-radius: 15px;
+            border: 2px solid #eee;
+            padding: 10px 15px;
+        }
+
+        input.form-control:focus {
+            border-color: var(--kiko-neon-yellow);
+            box-shadow: none;
+        }
     </style>
 </head>
 <body>
 
-<nav class="navbar navbar-dark mb-4">
-    <div class="container text-center">
-        <a class="navbar-brand mx-auto" href="#">🍔 KIKO'S BURGUER - CONTROL DE COSTOS</a>
+<nav class="navbar navbar-dark mb-5">
+    <div class="container justify-content-center">
+        <h2 class="navbar-brand m-0 fw-bold" style="font-size: 1.8rem;">🍔 KIKO'S BURGUER ADMIN</h2>
     </div>
 </nav>
 
@@ -85,82 +99,59 @@ TEMPLATE = """
     <div class="row">
         <div class="col-lg-4">
             <div class="card">
-                <div class="card-header"><i class="bi bi-egg-fried"></i> Nuevo Ingrediente</div>
+                <div class="card-header">🛒 Cargar Insumo</div>
                 <div class="card-body">
-                    <form method="post" action="/add_ing">
-                        <input class="form-control mb-2" name="nombre" placeholder="Nombre (ej: Medallón Carne)" required>
-                        <div class="input-group mb-2">
-                            <span class="input-group-text">$</span>
-                            <input class="form-control" name="precio" placeholder="Precio" type="number" step="0.01" required>
-                        </div>
-                        <input class="form-control mb-3" name="unidad" placeholder="Unidad (ej: gramos, unidad)">
-                        <button class="btn btn-primary w-100">Guardar Ingrediente</button>
-                    </form>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nombre</label>
+                        <input type="text" id="ing-nombre" class="form-control" placeholder="Ej: Medallón 180g">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Precio ($)</label>
+                        <input type="number" id="ing-precio" class="form-control" placeholder="0.00">
+                    </div>
+                    <button onclick="guardarIngrediente()" class="btn btn-kiko w-100">Guardar</button>
                 </div>
             </div>
 
             <div class="card">
-                <div class="card-header">Despensa de Precios</div>
+                <div class="card-header text-dark" style="background: #fff !important;">Lista de Precios</div>
                 <div class="card-body p-0">
-                    <ul class="list-group list-group-flush">
-                        {% for i in ingredientes %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ i.nombre }}
-                            <span class="text-muted">${{ i.precio }} / {{ i.unidad }}</span>
-                        </li>
-                        {% endfor %}
-                    </ul>
+                    <ul class="list-group list-group-flush" id="lista-ingredientes">
+                        </ul>
                 </div>
             </div>
         </div>
 
         <div class="col-lg-8">
             <div class="card">
-                <div class="card-header"><i class="bi bi-plus-circle"></i> Crear Nueva Hamburguesa</div>
+                <div class="card-header" style="background: #25d366 !important; color: white;">⚡ Calcular Costo de Hamburguesa</div>
                 <div class="card-body">
-                    <form method="post" action="/add_prod">
-                        <div class="row">
-                            <div class="col-md-6 mb-2">
-                                <input class="form-control" name="nombre" placeholder="Nombre de la Hamburguesa" required>
-                            </div>
-                            <div class="col-md-3 mb-2">
-                                <input class="form-control" name="packaging" placeholder="Packaging $" type="number" step="0.01">
-                            </div>
-                            <div class="col-md-3 mb-2">
-                                <input class="form-control" name="delivery" placeholder="Delivery $" type="number" step="0.01">
-                            </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Nombre de la Burger</label>
+                            <input type="text" id="prod-nombre" class="form-control" placeholder="Ej: La Kiko Monster">
                         </div>
-                        <div class="bg-light p-3 rounded mb-3">
-                            <small class="text-muted d-block mb-2">Ingredientes (ID=Cantidad, ej: 1=150):</small>
-                            <input class="form-control" name="ingredientes" placeholder="Ej: 1=1, 2=0.5" required>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Ingredientes (ID=Cant, ID=Cant)</label>
+                            <input type="text" id="prod-receta" class="form-control" placeholder="Ej: 1=1, 2=150">
                         </div>
-                        <button class="btn btn-success w-100">Registrar en Menú</button>
-                    </form>
+                    </div>
+                    <button onclick="calcularProducto()" class="btn btn-dark w-100 mb-2" style="border-radius: 50px;">CALCULAR COSTO</button>
                 </div>
             </div>
 
             <div class="card">
-                <div class="card-header">Listado de Costos de Venta</div>
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
+                    <table class="table align-middle mb-0">
+                        <thead class="table-dark">
                             <tr>
-                                <th>Producto</th>
-                                <th>Costo Ingredientes</th>
-                                <th>Costo Final (c/Pack)</th>
-                                <th>Acción</th>
+                                <th class="ps-4">Hamburguesa</th>
+                                <th>Costo Final</th>
+                                <th class="text-center">Acción</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {% for p in costos %}
-                            <tr>
-                                <td class="fw-bold">{{ p.nombre }}</td>
-                                <td>${{ "%.2f"|format(p.costo_base) }}</td>
-                                <td><span class="badge badge-cost">${{ "%.2f"|format(p.total) }}</span></td>
-                                <td><button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
+                        <tbody id="tabla-productos">
+                            </tbody>
                     </table>
                 </div>
             </div>
@@ -168,43 +159,76 @@ TEMPLATE = """
     </div>
 </div>
 
+<script>
+    // Usamos el almacenamiento del navegador (localStorage) en lugar de SQL
+    // para que funcione 100% en GitHub Pages sin errores.
+    let ingredientes = JSON.parse(localStorage.getItem('kiko_ings')) || [];
+    let productos = JSON.parse(localStorage.getItem('kiko_prods')) || [];
+
+    function guardarIngrediente() {
+        const nombre = document.getElementById('ing-nombre').value;
+        const precio = document.getElementById('ing-precio').value;
+        
+        if(!nombre || !precio) return alert("Completa los datos");
+
+        const nuevo = { id: ingredientes.length + 1, nombre, precio: parseFloat(precio) };
+        ingredientes.push(nuevo);
+        localStorage.setItem('kiko_ings', JSON.stringify(ingredientes));
+        actualizarUI();
+        document.getElementById('ing-nombre').value = '';
+        document.getElementById('ing-precio').value = '';
+    }
+
+    function calcularProducto() {
+        const nombre = document.getElementById('prod-nombre').value;
+        const recetaRaw = document.getElementById('prod-receta').value;
+
+        if(!nombre || !recetaRaw) return alert("Completa los datos");
+
+        let costoTotal = 0;
+        const partes = recetaRaw.split(',');
+
+        partes.forEach(p => {
+            const [id, cant] = p.split('=');
+            const ing = ingredientes.find(i => i.id == id.trim());
+            if(ing) costoTotal += (ing.precio * parseFloat(cant));
+        });
+
+        productos.push({ nombre, costo: costoTotal });
+        localStorage.setItem('kiko_prods', JSON.stringify(productos));
+        actualizarUI();
+    }
+
+    function borrarTodo() {
+        if(confirm("¿Borrar todo?")) {
+            localStorage.clear();
+            location.reload();
+        }
+    }
+
+    function actualizarUI() {
+        // Actualizar Lista Ingredientes
+        const lista = document.getElementById('lista-ingredientes');
+        lista.innerHTML = ingredientes.map(i => `
+            <li class="list-group-item d-flex justify-content-between p-3">
+                <span><strong>ID ${i.id}:</strong> ${i.nombre}</span>
+                <span class="badge bg-dark">$${i.precio}</span>
+            </li>
+        `).join('');
+
+        // Actualizar Tabla Productos
+        const tabla = document.getElementById('tabla-productos');
+        tabla.innerHTML = productos.map(p => `
+            <tr>
+                <td class="ps-4 fw-bold text-uppercase">${p.nombre}</td>
+                <td><span class="badge badge-price">$${p.costo.toFixed(2)}</span></td>
+                <td class="text-center"><button class="btn btn-sm btn-danger rounded-circle" onclick="alert('Funcionalidad de borrar en desarrollo')">×</button></td>
+            </tr>
+        `).join('');
+    }
+
+    actualizarUI();
+</script>
+
 </body>
 </html>
-"""
-
-# ===================== ROUTES =====================
-
-@app.route('/')
-def index():
-    conn = get_db()
-    ingredientes = conn.execute("SELECT * FROM ingredientes").fetchall()
-    costos = obtener_costos_todos()
-    conn.close()
-    return render_template_string(TEMPLATE, ingredientes=ingredientes, costos=costos)
-
-@app.route('/add_ing', methods=['POST'])
-def add_ing():
-    conn = get_db()
-    conn.execute("INSERT INTO ingredientes (nombre, precio, unidad) VALUES (?, ?, ?)",
-        (request.form['nombre'], float(request.form['precio']), request.form['unidad']))
-    conn.commit()
-    conn.close()
-    return redirect('/')
-
-@app.route('/add_prod', methods=['POST'])
-def add_prod():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO productos (nombre, packaging, delivery) VALUES (?, ?, ?)",
-        (request.form['nombre'], float(request.form['packaging'] or 0), float(request.form['delivery'] or 0)))
-    pid = cur.lastrowid
-    for item in request.form['ingredientes'].split(','):
-        if '=' in item:
-            i, c = item.split('=')
-            cur.execute("INSERT INTO producto_ingrediente VALUES (?, ?, ?)", (pid, int(i), float(c)))
-    conn.commit()
-    conn.close()
-    return redirect('/')
-
-if __name__ == '__main__':
-    app.run(debug=True)
