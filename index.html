@@ -1,172 +1,30 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>SISTEMA INSUMEX</title>
-    <style>
-        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
-        .box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; border-top: 5px solid #2c3e50; }
-        input, select, button { padding: 10px; margin: 5px; border: 1px solid #ccc; border-radius: 4px; }
-        button { cursor: pointer; font-weight: bold; background: #27ae60; color: white; border: none; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #ddd; }
-        .resumen { display: flex; justify-content: space-around; background: #2c3e50; color: white; padding: 15px; border-radius: 8px; }
-        .status { font-size: 13px; margin-bottom: 10px; font-weight: bold; }
-    </style>
-</head>
-<body>
+// Importar la función para inicializar la App
+import { initializeApp } from "firebase/app";
 
-    <h1>📦 Insumex: Control de Stock</h1>
-    <div id="conexion-status" class="status" style="color: orange;">⏳ Intentando conectar con Insumex Cloud...</div>
+// Importar los servicios específicos que necesitas
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getDatabase } from "firebase/database";
+import { getStorage } from "firebase/storage";
 
-    <div class="box">
-        <h2>1. Registrar Compra</h2>
-        <input type="date" id="f_fecha">
-        <input type="text" id="f_nombre" placeholder="Nombre (ej: Carne)">
-        <input type="number" id="f_total" placeholder="Costo Total $">
-        <input type="number" id="f_cant" placeholder="Cantidad (kg/un)">
-        <select id="f_unid"><option value="kg">kg</option><option value="un">un</option></select>
-        <button onclick="registrarCompra()">REGISTRAR COMPRA</button>
-        
-        <table id="tabla_compras">
-            <thead><tr><th>Fecha</th><th>Insumo</th><th>Cant.</th><th>Total</th></tr></thead>
-            <tbody></tbody>
-        </table>
-    </div>
-
-    <div class="box">
-        <h2>2. Registrar Gasto</h2>
-        <select id="sel_insumos"><option value="">-- Seleccionar --</option></select>
-        <input type="number" id="g_cant" placeholder="Cantidad usada">
-        <button style="background: #e67e22;" onclick="registrarGasto()">CARGAR GASTO</button>
-    </div>
-
-    <div class="box">
-        <h2>3. Stock en Heladera</h2>
-        <table id="tabla_stock">
-            <thead><tr><th>Insumo</th><th>Comprado</th><th>Gastado</th><th>En Stock</th><th>Valor $</th></tr></thead>
-            <tbody></tbody>
-        </table>
-    </div>
-
-    <div class="resumen">
-        <div>COMPRAS: <b id="r_compras">$0</b></div>
-        <div>GASTADO: <b id="r_gastado">$0</b></div>
-        <div>EN STOCK: <b id="r_stock">$0</b></div>
-    </div>
-
-    <button onclick="resetearTodo()" style="background: #c0392b; margin-top: 20px; width: 100%;">⚠️ RESETEAR SISTEMA (Borra nube)</button>
-
-    <!-- Cargamos Firebase desde un servidor alternativo para evitar bloqueos -->
-    <script src="https://gstatic.com"></script>
-    <script src="https://gstatic.com"></script>
-
-<script>
-    // Configuración con tu URL exacta de Insumex
-    const firebaseConfig = {
+// Tu configuración de Firebase
+const firebaseConfig = {
   apiKey: "AIzaSyCDnMHlcO9JME_CBQDrawKGU6t1GIfGKWU",
-  authDomain: "insumex-a02f5.firebaseapp.com",
-  databaseURL: "https://insumex-a02f5-default-rtdb.firebaseio.com",
+  authDomain: "://firebaseapp.com",
+  databaseURL: "https://firebaseio.com",
   projectId: "insumex-a02f5",
   storageBucket: "insumex-a02f5.firebasestorage.app",
   messagingSenderId: "478815059725",
   appId: "1:478815059725:web:7fbb95307cab1fc86eba44"
 };
 
-    var database;
-    var inventarioRef;
-    var dataLocal = { compras: {}, gastos: {} };
+// Inicializar Firebase
+const app = initializeApp(firebaseConfig);
 
-    // Inicialización
-    try {
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        database = firebase.database();
-        inventarioRef = database.ref("inventario");
+// Inicializar y exportar los servicios para usarlos en toda tu app
+export const auth = getAuth(app);           // Para login/registro
+export const db = getFirestore(app);         // Para base de datos Cloud Firestore
+export const rtdb = getDatabase(app);       // Para Realtime Database (por tu databaseURL)
+export const storage = getStorage(app);     // Para subir fotos/archivos
 
-        // Escuchar datos
-        inventarioRef.on("value", function(snapshot) {
-            document.getElementById("conexion-status").innerText = "✅ SISTEMA ONLINE";
-            document.getElementById("conexion-status").style.color = "green";
-            var val = snapshot.val();
-            dataLocal = val ? { compras: val.compras || {}, gastos: val.gastos || {} } : { compras: {}, gastos: {} };
-            dibujarTodo();
-        }, function(error) {
-            document.getElementById("conexion-status").innerText = "❌ Error de Permisos: " + error.code;
-            console.error(error);
-        });
-    } catch (e) {
-        document.getElementById("conexion-status").innerText = "❌ Error crítico de carga. Revisa la consola.";
-        console.error(e);
-    }
-
-    window.onload = function() { document.getElementById('f_fecha').valueAsDate = new Date(); };
-
-    function registrarCompra() {
-        var nom = document.getElementById("f_nombre").value.toUpperCase().trim();
-        var tot = parseFloat(document.getElementById("f_total").value);
-        var can = parseFloat(document.getElementById("f_cant").value);
-        var fec = document.getElementById("f_fecha").value;
-        var uni = document.getElementById("f_unid").value;
-
-        if(!nom || isNaN(tot) || isNaN(can)) { alert("Completa los campos"); return; }
-        
-        database.ref("inventario/compras").push({
-            f: fec, n: nom, t: tot, c: can, u: uni, precioUnit: (tot/can)
-        });
-
-        document.getElementById("f_nombre").value = "";
-        document.getElementById("f_total").value = "";
-        document.getElementById("f_cant").value = "";
-    }
-
-    function registrarGasto() {
-        var nom = document.getElementById("sel_insumos").value;
-        var can = parseFloat(document.getElementById("g_cant").value);
-        if(!nom || isNaN(can)) { alert("Datos incompletos"); return; }
-        database.ref("inventario/gastos").push({ n: nom, c: can });
-        document.getElementById("g_cant").value = "";
-    }
-
-    function resetearTodo() {
-        if(confirm("¿Borrar todos los datos de la nube?")) {
-            inventarioRef.remove();
-        }
-    }
-
-    function dibujarTodo() {
-        var t_compras = document.querySelector("#tabla_compras tbody");
-        var t_stock = document.querySelector("#tabla_stock tbody");
-        var sel = document.getElementById("sel_insumos");
-        t_compras.innerHTML = ""; t_stock.innerHTML = "";
-        var tempSel = sel.value;
-        sel.innerHTML = '<option value="">-- Seleccionar --</option>';
-        
-        var sumC = 0, sumG = 0, sumS = 0, inv = {};
-
-        Object.values(dataLocal.compras).forEach(function(c) {
-            sumC += c.t;
-            t_compras.innerHTML += "<tr><td>"+c.f+"</td><td>"+c.n+"</td><td>"+c.c+c.u+"</td><td>$"+c.t.toFixed(2)+"</td></tr>";
-            if(!inv[c.n]) inv[c.n] = { comp: 0, gast: 0, precio: c.precioUnit, med: c.u };
-            inv[c.n].comp += c.c;
-        });
-
-        Object.values(dataLocal.gastos).forEach(function(g) {
-            if(inv[g.n]) inv[g.n].gast += g.c;
-        });
-
-        Object.keys(inv).sort().forEach(function(n) {
-            var item = inv[n], stock = item.comp - item.gast, valS = stock * item.precio;
-            sumG += (item.gast * item.precio); sumS += valS;
-            sel.innerHTML += '<option value="'+n+'" '+(n == tempSel ? "selected" : "")+'>'+n+'</option>';
-            t_stock.innerHTML += "<tr><td><b>"+n+"</b></td><td>"+item.comp.toFixed(2)+"</td><td style='color:red'>-"+item.gast.toFixed(2)+"</td><td>"+stock.toFixed(2)+" "+item.med+"</td><td style='color:green'>$"+valS.toFixed(2)+"</td></tr>";
-        });
-
-        document.getElementById("r_compras").innerText = "$" + sumC.toFixed(2);
-        document.getElementById("r_gastado").innerText = "$" + sumG.toFixed(2);
-        document.getElementById("r_stock").innerText = "$" + sumS.toFixed(2);
-    }
-</script>
-</body>
-</html>
+export default app;
