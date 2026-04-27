@@ -2,123 +2,63 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Control de Stock - HambuCloud Chibi</title>
+    <title>SISTEMA DE STOCK</title>
     <style>
-        :root {
-            --primary: #2196f3; /* Azul Francia */
-            --accent: #ff9800;
-            --dark: #2c3e50;
-        }
-
-        body { 
-            font-family: 'Segoe UI', sans-serif; 
-            /* Fondo con imagen estilo Chibi (Hamburguesas y Números) */
-            background: linear-gradient(rgba(255,255,255,0.9), rgba(255,255,255,0.9)), 
-                        url('https://freepik.com');
-            background-size: 300px;
-            padding: 20px; 
-            margin: 0;
-        }
-
-        .container { max-width: 1000px; margin: auto; }
-
-        .box { 
-            background: rgba(255, 255, 255, 0.95); 
-            padding: 25px; 
-            border-radius: 15px; 
-            box-shadow: 0 8px 20px rgba(0,0,0,0.1); 
-            margin-bottom: 25px; 
-            border-top: 6px solid var(--dark); 
-        }
-
-        h1 { text-align: center; color: var(--dark); text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
-        h2 { margin-top: 0; color: var(--dark); font-size: 1.2rem; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-
-        input, select, button { padding: 12px; margin: 5px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
-        
-        button { cursor: pointer; font-weight: bold; border: none; color: white; transition: 0.3s; }
-        .btn-green { background: #27ae60; }
-        .btn-green:hover { background: #219150; }
-        
-        .btn-blue { background: #0056b3; } /* Azul Francia */
-        .btn-blue:hover { background: #004494; }
-
-        .btn-del { background: #e74c3c; padding: 5px 10px; font-size: 12px; }
-        .btn-del:hover { background: #c0392b; }
-
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border-radius: 8px; overflow: hidden; }
-        th { background: var(--dark); color: white; text-align: left; padding: 12px; font-size: 13px; }
-        td { padding: 12px; border-bottom: 1px solid #eee; color: #333; }
-        tr:hover { background: #f9f9f9; }
-
-        .resumen { 
-            display: flex; 
-            justify-content: space-around; 
-            background: var(--dark); 
-            color: white; 
-            padding: 25px; 
-            border-radius: 15px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        }
-        .resumen div { text-align: center; font-weight: bold; }
-        .resumen b { display: block; font-size: 1.8rem; color: #ffeb3b; margin-top: 5px; }
-
-        .stock-tag { background: #eee; padding: 4px 8px; border-radius: 5px; font-weight: bold; }
+        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
+        .box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; border-top: 5px solid #2c3e50; }
+        input, select, button { padding: 10px; margin: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        button { cursor: pointer; font-weight: bold; background: #27ae60; color: white; border: none; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #ddd; }
+        .resumen { display: flex; justify-content: space-around; background: #2c3e50; color: white; padding: 15px; border-radius: 8px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>🍔 Inventario Burger Chibi 📊</h1>
+    <h1>?? Control de Inventario Local</h1>
 
-    <!-- 1. REGISTRO DE COMPRAS -->
     <div class="box">
-        <h2>1. Registrar Compra de Insumos</h2>
-        <div style="display: flex; flex-wrap: wrap;">
-            <input type="date" id="f_fecha">
-            <input type="text" id="f_nombre" placeholder="¿Qué compraste? (ej: Pan)" style="flex: 2;">
-            <input type="number" id="f_total" placeholder="Costo Total $">
-            <input type="number" id="f_cant" placeholder="Cantidad">
-            <select id="f_unid"><option value="kg">kg</option><option value="un">un</option></select>
-            <button class="btn-green" onclick="registrarCompra()">REGISTRAR COMPRA</button>
-        </div>
+        <h2>1. Registrar Compra</h2>
+        <input type="date" id="f_fecha">
+        <input type="text" id="f_nombre" placeholder="Nombre (ej: Carne)">
+        <input type="number" id="f_total" placeholder="Costo Total $">
+        <input type="number" id="f_cant" placeholder="Cantidad (kg/un)">
+        <select id="f_unid"><option value="kg">kg</option><option value="un">un</option></select>
+        <button onclick="registrarCompra()">REGISTRAR COMPRA</button>
         
-        <table>
-            <thead><tr><th>Fecha</th><th>Insumo</th><th>Cantidad</th><th>Total</th><th>Acción</th></tr></thead>
-            <tbody id="tabla_compras"></tbody>
+        <table id="tabla_compras">
+            <thead><tr><th>Fecha</th><th>Insumo</th><th>Cant.</th><th>Total</th></tr></thead>
+            <tbody></tbody>
         </table>
     </div>
 
-    <!-- 2. REGISTRO DE GASTOS -->
     <div class="box">
-        <h2>2. Registrar Gasto Diario</h2>
-        <div style="display: flex; flex-wrap: wrap; align-items: center;">
-            <select id="sel_insumos" style="flex: 2; border: 2px solid #0056b3;"><option value="">-- Seleccionar Insumo --</option></select>
-            <input type="number" id="g_cant" placeholder="Cantidad usada">
-            <button class="btn-blue" onclick="registrarGasto()">CARGAR GASTO</button>
-        </div>
+        <h2>2. Registrar Gasto</h2>
+        <select id="sel_insumos"><option value="">-- Seleccionar --</option></select>
+        <input type="number" id="g_cant" placeholder="Cantidad usada">
+        <button style="background: #e67e22;" onclick="registrarGasto()">CARGAR GASTO</button>
     </div>
 
-    <!-- 3. STOCK FINAL -->
     <div class="box">
-        <h2>3. Stock en Heladera y Valorización</h2>
-        <table>
-            <thead><tr><th>Insumo</th><th>Comprado</th><th>Gastado</th><th>En Stock</th><th>Valor Stock</th><th>Limpiar</th></tr></thead>
-            <tbody id="tabla_stock"></tbody>
+        <h2>3. Stock en Heladera</h2>
+        <table id="tabla_stock">
+            <thead><tr><th>Insumo</th><th>Comprado</th><th>Gastado</th><th>En Stock</th><th>Valor $</th></tr></thead>
+            <tbody></tbody>
         </table>
     </div>
 
-    <!-- RESUMEN CONTABLE -->
     <div class="resumen">
-        <div>SALIDA TOTAL (COMPRAS)<b id="r_compras">$0.00</b></div>
-        <div>VALOR CONSUMIDO<b id="r_gastado">$0.00</b></div>
-        <div>VALOR EN MERCADERÍA<b id="r_stock">$0.00</b></div>
+        <div>COMPRAS: <b id="r_compras">$0</b></div>
+        <div>GASTADO: <b id="r_gastado">$0</b></div>
+        <div>EN STOCK: <b id="r_stock">$0</b></div>
     </div>
-</div>
+
+    <button onclick="reiniciarTodo()" style="background: #c0392b; margin-top: 20px; width: 100%;">?? RESETEAR SISTEMA (Borrar errores de memoria)</button>
 
 <script>
-    const CLAVE = "HAMBU_CHIBI_DATA_V1";
-    let db = JSON.parse(localStorage.getItem(CLAVE)) || { compras: [], gastos: [] };
+    // Usamos una clave totalmente nueva para evitar conflictos
+    var CLAVE = "DATA_STOCK_V100";
+    var db = JSON.parse(localStorage.getItem(CLAVE)) || { compras: [], gastos: [] };
 
     window.onload = function() {
         document.getElementById('f_fecha').valueAsDate = new Date();
@@ -126,15 +66,15 @@
     };
 
     function registrarCompra() {
-        const nom = document.getElementById("f_nombre").value.toUpperCase().trim();
-        const tot = parseFloat(document.getElementById("f_total").value);
-        const can = parseFloat(document.getElementById("f_cant").value);
-        const fec = document.getElementById("f_fecha").value;
-        const uni = document.getElementById("f_unid").value;
+        var nom = document.getElementById("f_nombre").value.toUpperCase().trim();
+        var tot = parseFloat(document.getElementById("f_total").value);
+        var can = parseFloat(document.getElementById("f_cant").value);
+        var fec = document.getElementById("f_fecha").value;
+        var uni = document.getElementById("f_unid").value;
 
-        if(!nom || isNaN(tot) || isNaN(can)) { alert("Completa todos los campos correctamente"); return; }
+        if(!nom || isNaN(tot) || isNaN(can)) { alert("Completa todos los campos con números"); return; }
 
-        db.compras.push({ f: fec, n: nom, t: tot, c: can, u: uni, pu: (tot/can) });
+        db.compras.push({ f: fec, n: nom, t: tot, c: can, u: uni, precioUnit: (tot/can) });
         actualizar();
         document.getElementById("f_nombre").value = "";
         document.getElementById("f_total").value = "";
@@ -142,29 +82,14 @@
     }
 
     function registrarGasto() {
-        const nom = document.getElementById("sel_insumos").value;
-        const can = parseFloat(document.getElementById("g_cant").value);
+        var nom = document.getElementById("sel_insumos").value;
+        var can = parseFloat(document.getElementById("g_cant").value);
 
-        if(!nom || isNaN(can)) { alert("Selecciona insumo y cantidad consumida"); return; }
+        if(!nom || isNaN(can)) { alert("Selecciona insumo y cantidad"); return; }
 
         db.gastos.push({ n: nom, c: can });
         actualizar();
         document.getElementById("g_cant").value = "";
-    }
-
-    function borrarFilaCompra(idx) {
-        if(confirm("¿Eliminar este registro de compra?")) {
-            db.compras.splice(idx, 1);
-            actualizar();
-        }
-    }
-
-    function borrarInsumoCompleto(nombre) {
-        if(confirm(`¿Quieres borrar TODO el historial de "${nombre}"?`)) {
-            db.compras = db.compras.filter(c => c.n !== nombre);
-            db.gastos = db.gastos.filter(g => g.n !== nombre);
-            actualizar();
-        }
     }
 
     function actualizar() {
@@ -172,54 +97,58 @@
         dibujarTodo();
     }
 
+    function reiniciarTodo() {
+        if(confirm("¿Borrar todo y empezar de cero?")) {
+            localStorage.removeItem(CLAVE);
+            db = { compras: [], gastos: [] };
+            dibujarTodo();
+        }
+    }
+
     function dibujarTodo() {
-        const t_c = document.querySelector("#tabla_compras tbody");
-        const t_s = document.querySelector("#tabla_stock tbody");
-        const sel = document.getElementById("sel_insumos");
+        var t_compras = document.querySelector("#tabla_compras tbody");
+        var t_stock = document.querySelector("#tabla_stock tbody");
+        var sel = document.getElementById("sel_insumos");
         
-        t_c.innerHTML = ""; t_s.innerHTML = "";
+        t_compras.innerHTML = ""; t_stock.innerHTML = "";
         sel.innerHTML = '<option value="">-- Seleccionar --</option>';
 
-        let s_compras = 0; let s_gastado = 0; let s_stock = 0;
-        let inv = {};
+        var sumC = 0; var sumG = 0; var sumS = 0;
+        var inv = {};
 
-        // 1. Cargar Compras
-        db.compras.forEach((c, idx) => {
-            s_compras += c.t;
-            t_c.innerHTML += `<tr><td>${c.f}</td><td>${c.n}</td><td>${c.c} ${c.u}</td><td>$${c.t.toFixed(2)}</td><td><button class="btn-del" onclick="borrarFilaCompra(${idx})">Eliminar</button></td></tr>`;
+        // Procesar Compras
+        for(var i=0; i<db.compras.length; i++) {
+            var c = db.compras[i];
+            sumC += c.t;
+            t_compras.innerHTML += "<tr><td>"+c.f+"</td><td>"+c.n+"</td><td>"+c.c+c.u+"</td><td>$"+c.t+"</td></tr>";
             
-            if(!inv[c.n]) inv[c.n] = { comp: 0, gast: 0, precio: c.pu, med: c.u };
+            if(!inv[c.n]) inv[c.n] = { comp: 0, gast: 0, precio: c.precioUnit, med: c.u };
             inv[c.n].comp += c.c;
-        });
+        }
 
-        // 2. Cargar Gastos
-        db.gastos.forEach(g => {
+        // Procesar Gastos
+        for(var j=0; j<db.gastos.length; j++) {
+            var g = db.gastos[j];
             if(inv[g.n]) inv[g.n].gast += g.c;
-        });
+        }
 
-        // 3. Stock y Selector
-        Object.keys(inv).sort().forEach(nombre => {
-            const i = inv[nombre];
-            const stock = i.comp - i.gast;
-            const val_s = stock * i.precio;
-            s_gastado += (i.gast * i.precio);
-            s_stock += val_s;
+        // Dibujar Stock y Llenar Selector
+        var nombres = Object.keys(inv);
+        for(var k=0; k<nombres.length; k++) {
+            var n = nombres[k];
+            var item = inv[n];
+            var stock = item.comp - item.gast;
+            var valS = stock * item.precio;
+            sumG += (item.gast * item.precio);
+            sumS += valS;
 
-            sel.innerHTML += `<option value="${nombre}">${nombre}</option>`;
-            t_s.innerHTML += `
-                <tr>
-                    <td><b>${nombre}</b></td>
-                    <td>${i.comp.toFixed(2)}</td>
-                    <td style="color:red">-${i.gast.toFixed(2)}</td>
-                    <td><span class="stock-tag">${stock.toFixed(2)} ${i.med}</span></td>
-                    <td style="color:green; font-weight:bold">$${val_s.toFixed(2)}</td>
-                    <td><button class="btn-del" onclick="borrarInsumoCompleto('${nombre}')">Limpiar</button></td>
-                </tr>`;
-        });
+            sel.innerHTML += '<option value="'+n+'">'+n+'</option>';
+            t_stock.innerHTML += "<tr><td><b>"+n+"</b></td><td>"+item.comp+"</td><td style='color:red'>-"+item.gast+"</td><td>"+stock.toFixed(2)+" "+item.med+"</td><td style='color:green'>$"+valS.toFixed(2)+"</td></tr>";
+        }
 
-        document.getElementById("r_compras").innerText = "$" + s_compras.toFixed(2);
-        document.getElementById("r_gastado").innerText = "$" + s_gastado.toFixed(2);
-        document.getElementById("r_stock").innerText = "$" + s_stock.toFixed(2);
+        document.getElementById("r_compras").innerText = "$" + sumC.toFixed(2);
+        document.getElementById("r_gastado").innerText = "$" + sumG.toFixed(2);
+        document.getElementById("r_stock").innerText = "$" + sumS.toFixed(2);
     }
 </script>
 </body>
