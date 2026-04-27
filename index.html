@@ -1,9 +1,67 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SISTEMA DE STOCK</title>
 
-// Your web app's Firebase configuration
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
+        .box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; border-top: 5px solid #2c3e50; }
+        input, select, button { padding: 10px; margin: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        button { cursor: pointer; font-weight: bold; background: #27ae60; color: white; border: none; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #ddd; }
+        .resumen { display: flex; justify-content: space-around; background: #2c3e50; color: white; padding: 15px; border-radius: 8px; }
+    </style>
+</head>
+
+<body>
+
+<h1>📦 Control de Inventario Online</h1>
+
+<div class="box">
+    <h2>1. Registrar Compra</h2>
+    <input type="date" id="f_fecha">
+    <input type="text" id="f_nombre" placeholder="Nombre">
+    <input type="number" id="f_total" placeholder="Costo Total $">
+    <input type="number" id="f_cant" placeholder="Cantidad">
+    <select id="f_unid"><option value="kg">kg</option><option value="un">un</option></select>
+    <button onclick="registrarCompra()">REGISTRAR COMPRA</button>
+
+    <table id="tabla_compras">
+        <thead><tr><th>Fecha</th><th>Insumo</th><th>Cant.</th><th>Total</th></tr></thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div class="box">
+    <h2>2. Registrar Gasto</h2>
+    <select id="sel_insumos"><option value="">-- Seleccionar --</option></select>
+    <input type="number" id="g_cant" placeholder="Cantidad usada">
+    <button style="background: #e67e22;" onclick="registrarGasto()">CARGAR GASTO</button>
+</div>
+
+<div class="box">
+    <h2>3. Stock</h2>
+    <table id="tabla_stock">
+        <thead><tr><th>Insumo</th><th>Comprado</th><th>Gastado</th><th>Stock</th><th>Valor</th></tr></thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div class="resumen">
+    <div>COMPRAS: <b id="r_compras">$0</b></div>
+    <div>GASTADO: <b id="r_gastado">$0</b></div>
+    <div>STOCK: <b id="r_stock">$0</b></div>
+</div>
+
+<button onclick="reiniciarTodo()" style="background:red;width:100%">RESETEAR</button>
+
+<!-- 🔥 FIREBASE -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
 const firebaseConfig = {
   apiKey: "AIzaSyCDnMHlcO9JME_CBQDrawKGU6t1GIfGKWU",
   authDomain: "insumex-a02f5.firebaseapp.com",
@@ -14,5 +72,129 @@ const firebaseConfig = {
   appId: "1:478815059725:web:7fbb95307cab1fc86eba44"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+window.db = db;
+
+/* ================= FUNCIONES ================= */
+
+window.onload = function() {
+    document.getElementById('f_fecha').valueAsDate = new Date();
+    iniciarRealtime();
+};
+
+window.registrarCompra = function() {
+    var nom = document.getElementById("f_nombre").value.toUpperCase().trim();
+    var tot = parseFloat(document.getElementById("f_total").value);
+    var can = parseFloat(document.getElementById("f_cant").value);
+    var fec = document.getElementById("f_fecha").value;
+    var uni = document.getElementById("f_unid").value;
+
+    if(!nom || isNaN(tot) || isNaN(can)) return;
+
+    push(ref(db, "compras"), {
+        f: fec,
+        n: nom,
+        t: tot,
+        c: can,
+        u: uni,
+        precioUnit: (tot / can)
+    });
+};
+
+window.registrarGasto = function() {
+    var nom = document.getElementById("sel_insumos").value;
+    var can = parseFloat(document.getElementById("g_cant").value);
+
+    if(!nom || isNaN(can)) return;
+
+    push(ref(db, "gastos"), {
+        n: nom,
+        c: can
+    });
+};
+
+window.reiniciarTodo = function() {
+    if(confirm("¿Borrar todo?")) {
+        remove(ref(db, "compras"));
+        remove(ref(db, "gastos"));
+    }
+};
+
+/* ================= REALTIME ================= */
+
+function iniciarRealtime() {
+    let compras = [];
+    let gastos = [];
+
+    onValue(ref(db, "compras"), (snap) => {
+        compras = [];
+        snap.forEach(c => compras.push(c.val()));
+        render(compras, gastos);
+    });
+
+    onValue(ref(db, "gastos"), (snap) => {
+        gastos = [];
+        snap.forEach(g => gastos.push(g.val()));
+        render(compras, gastos);
+    });
+}
+
+/* ================= TU LOGICA ORIGINAL ================= */
+
+function render(compras, gastos) {
+
+    var t_compras = document.querySelector("#tabla_compras tbody");
+    var t_stock = document.querySelector("#tabla_stock tbody");
+    var sel = document.getElementById("sel_insumos");
+
+    t_compras.innerHTML = ""; t_stock.innerHTML = "";
+    sel.innerHTML = '<option value="">-- Seleccionar --</option>';
+
+    var sumC = 0; var sumG = 0; var sumS = 0;
+    var inv = {};
+
+    for(var i=0; i<compras.length; i++) {
+        var c = compras[i];
+        sumC += c.t;
+        t_compras.innerHTML += `<tr><td>${c.f}</td><td>${c.n}</td><td>${c.c}${c.u}</td><td>$${c.t}</td></tr>`;
+        
+        if(!inv[c.n]) inv[c.n] = { comp: 0, gast: 0, precio: c.precioUnit, med: c.u };
+        inv[c.n].comp += c.c;
+    }
+
+    for(var j=0; j<gastos.length; j++) {
+        var g = gastos[j];
+        if(inv[g.n]) inv[g.n].gast += g.c;
+    }
+
+    var nombres = Object.keys(inv);
+    for(var k=0; k<nombres.length; k++) {
+        var n = nombres[k];
+        var item = inv[n];
+        var stock = item.comp - item.gast;
+        var valS = stock * item.precio;
+
+        sumG += (item.gast * item.precio);
+        sumS += valS;
+
+        sel.innerHTML += `<option value="${n}">${n}</option>`;
+        t_stock.innerHTML += `<tr>
+            <td><b>${n}</b></td>
+            <td>${item.comp}</td>
+            <td style="color:red">-${item.gast}</td>
+            <td>${stock.toFixed(2)} ${item.med}</td>
+            <td style="color:green">$${valS.toFixed(2)}</td>
+        </tr>`;
+    }
+
+    document.getElementById("r_compras").innerText = "$" + sumC.toFixed(2);
+    document.getElementById("r_gastado").innerText = "$" + sumG.toFixed(2);
+    document.getElementById("r_stock").innerText = "$" + sumS.toFixed(2);
+}
+
+</script>
+
+</body>
+</html>
