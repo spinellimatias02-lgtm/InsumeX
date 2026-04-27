@@ -16,7 +16,7 @@
 </head>
 <body>
 
-    <h1>📦 Insumex: Control con Firestore</h1>
+    <h1>📦 Insumex: Inventario con Firestore</h1>
     <div id="conexion-status" class="status" style="color: orange;">⏳ Conectando a Firestore...</div>
 
     <div class="box">
@@ -55,11 +55,12 @@
         <div>EN STOCK: <b id="r_stock">$0</b></div>
     </div>
 
-    <button id="btnReset" style="background: #c0392b; margin-top: 20px; width: 100%;">⚠️ REINICIAR (Borra datos locales y nube)</button>
+    <button id="btnReset" style="background: #c0392b; margin-top: 20px; width: 100%;">⚠️ RESETEAR SISTEMA (Borra todo en Firestore)</button>
 
     <script type="module">
+        // Importación de módulos de Firebase v10
         import { initializeApp } from "https://gstatic.com";
-        import { getFirestore, collection, addDoc, onSnapshot, query, deleteDoc, getDocs } from "https://gstatic.com";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, getDocs, query, orderBy } from "https://gstatic.com";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCDnMHlcO9JME_CBQDrawKGU6t1GIfGKWU",
@@ -70,28 +71,33 @@
             appId: "1:478815059725:web:7fbb95307cab1fc86eba44"
         };
 
+        // Inicializar Firebase y Firestore
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        let datos = { compras: [], gastos: [] };
+        let datosLocal = { compras: [], gastos: [] };
 
-        // Escuchar Compras en tiempo real
-        onSnapshot(collection(db, "compras"), (snapshot) => {
-            datos.compras = snapshot.docs.map(doc => doc.data());
-            document.getElementById("conexion-status").innerText = "✅ Conectado a Firestore";
+        // Sincronización en tiempo real de Compras (ordenadas por fecha)
+        const qCompras = query(collection(db, "compras"), orderBy("f", "desc"));
+        onSnapshot(qCompras, (snapshot) => {
+            datosLocal.compras = snapshot.docs.map(doc => doc.data());
+            document.getElementById("conexion-status").innerText = "✅ Conectado a Insumex Firestore";
             document.getElementById("conexion-status").style.color = "green";
             dibujarTodo();
+        }, (error) => {
+            document.getElementById("conexion-status").innerText = "❌ Error Firestore: " + error.message;
+            document.getElementById("conexion-status").style.color = "red";
         });
 
-        // Escuchar Gastos en tiempo real
+        // Sincronización en tiempo real de Gastos
         onSnapshot(collection(db, "gastos"), (snapshot) => {
-            datos.gastos = snapshot.docs.map(doc => doc.data());
+            datosLocal.gastos = snapshot.docs.map(doc => doc.data());
             dibujarTodo();
         });
 
         window.onload = () => document.getElementById('f_fecha').valueAsDate = new Date();
 
-        // Registrar Compra en Firestore
+        // Botón Registrar Compra
         document.getElementById("btnCompra").onclick = async () => {
             const nom = document.getElementById("f_nombre").value.toUpperCase().trim();
             const tot = parseFloat(document.getElementById("f_total").value);
@@ -99,37 +105,39 @@
             const fec = document.getElementById("f_fecha").value;
             const uni = document.getElementById("f_unid").value;
 
-            if(!nom || isNaN(tot) || isNaN(can)) return alert("Completa los campos");
+            if(!nom || isNaN(tot) || isNaN(can)) return alert("Completa todos los campos correctamente.");
 
             try {
                 await addDoc(collection(db, "compras"), {
-                    f: fec, n: nom, t: tot, c: can, u: uni, precioUnit: (tot/can), timestamp: Date.now()
+                    f: fec, n: nom, t: tot, c: can, u: uni, precioUnit: (tot/can), creado: Date.now()
                 });
                 document.getElementById("f_nombre").value = "";
                 document.getElementById("f_total").value = "";
                 document.getElementById("f_cant").value = "";
-            } catch (e) { alert("Error al guardar: " + e); }
+            } catch (e) { alert("Error al guardar: " + e.message); }
         };
 
-        // Registrar Gasto en Firestore
+        // Botón Registrar Gasto
         document.getElementById("btnGasto").onclick = async () => {
             const nom = document.getElementById("sel_insumos").value;
             const can = parseFloat(document.getElementById("g_cant").value);
-            if(!nom || isNaN(can)) return alert("Selecciona insumo y cantidad");
+
+            if(!nom || isNaN(can)) return alert("Selecciona un insumo e ingresa la cantidad gastada.");
 
             try {
-                await addDoc(collection(db, "gastos"), { n: nom, c: can, timestamp: Date.now() });
+                await addDoc(collection(db, "gastos"), { n: nom, c: can, creado: Date.now() });
                 document.getElementById("g_cant").value = "";
-            } catch (e) { alert("Error al guardar gasto: " + e); }
+            } catch (e) { alert("Error al guardar gasto: " + e.message); }
         };
 
-        // Resetear (Borra todos los documentos de ambas colecciones)
+        // Botón Resetear Todo
         document.getElementById("btnReset").onclick = async () => {
-            if(confirm("¿Borrar permanentemente todos los datos de Firestore?")) {
-                const qCompras = await getDocs(collection(db, "compras"));
-                qCompras.forEach(async (d) => await deleteDoc(d.ref));
-                const qGastos = await getDocs(collection(db, "gastos"));
-                qGastos.forEach(async (d) => await deleteDoc(d.ref));
+            if(confirm("¿Estás seguro de borrar todos los datos de la nube definitivamente?")) {
+                const snapC = await getDocs(collection(db, "compras"));
+                snapC.forEach(async (d) => await deleteDoc(d.ref));
+                const snapG = await getDocs(collection(db, "gastos"));
+                snapG.forEach(async (d) => await deleteDoc(d.ref));
+                alert("Base de datos reseteada.");
             }
         };
 
@@ -139,23 +147,28 @@
             const sel = document.getElementById("sel_insumos");
             
             t_compras.innerHTML = ""; t_stock.innerHTML = "";
+            const currentSel = sel.value; // Guardar selección actual
             sel.innerHTML = '<option value="">-- Seleccionar --</option>';
 
             let sumC = 0, sumG = 0, sumS = 0, inv = {};
 
-            datos.compras.forEach(c => {
+            // Procesar Compras
+            datosLocal.compras.forEach(c => {
                 sumC += c.t;
                 t_compras.innerHTML += `<tr><td>${c.f}</td><td>${c.n}</td><td>${c.c}${c.u}</td><td>$${c.t.toFixed(2)}</td></tr>`;
                 if(!inv[c.n]) inv[c.n] = { comp: 0, gast: 0, precio: c.precioUnit, med: c.u };
                 inv[c.n].comp += c.c;
             });
 
-            datos.gastos.forEach(g => { if(inv[g.n]) inv[g.n].gast += g.c; });
+            // Procesar Gastos
+            datosLocal.gastos.forEach(g => { if(inv[g.n]) inv[g.n].gast += g.c; });
 
+            // Calcular Stock y dibujar
             Object.keys(inv).sort().forEach(n => {
                 const item = inv[n], stock = item.comp - item.gast, valS = stock * item.precio;
                 sumG += (item.gast * item.precio); sumS += valS;
-                sel.innerHTML += `<option value="${n}">${n}</option>`;
+                
+                sel.innerHTML += `<option value="${n}" ${n === currentSel ? 'selected' : ''}>${n}</option>`;
                 t_stock.innerHTML += `<tr><td><b>${n}</b></td><td>${item.comp.toFixed(2)}</td><td style='color:red'>-${item.gast.toFixed(2)}</td><td>${stock.toFixed(2)} ${item.med}</td><td style='color:green'>$${valS.toFixed(2)}</td></tr>`;
             });
 
