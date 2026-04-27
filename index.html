@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>SISTEMA DE STOCK</title>
+    <title>SISTEMA INSUMEX - STOCK</title>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
         .box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; border-top: 5px solid #2c3e50; }
@@ -11,11 +11,13 @@
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { text-align: left; padding: 10px; border-bottom: 1px solid #ddd; }
         .resumen { display: flex; justify-content: space-around; background: #2c3e50; color: white; padding: 15px; border-radius: 8px; }
+        .status { font-size: 12px; color: #7f8c8d; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-    <h1>?? Control de Inventario Local</h1>
+    <h1>📦 Insumex: Control de Inventario</h1>
+    <div id="conexion-status" class="status">Conectando a Firebase...</div>
 
     <div class="box">
         <h2>1. Registrar Compra</h2>
@@ -24,7 +26,7 @@
         <input type="number" id="f_total" placeholder="Costo Total $">
         <input type="number" id="f_cant" placeholder="Cantidad (kg/un)">
         <select id="f_unid"><option value="kg">kg</option><option value="un">un</option></select>
-        <button onclick="registrarCompra()">REGISTRAR COMPRA</button>
+        <button id="btnCompra">REGISTRAR COMPRA</button>
         
         <table id="tabla_compras">
             <thead><tr><th>Fecha</th><th>Insumo</th><th>Cant.</th><th>Total</th></tr></thead>
@@ -36,7 +38,7 @@
         <h2>2. Registrar Gasto</h2>
         <select id="sel_insumos"><option value="">-- Seleccionar --</option></select>
         <input type="number" id="g_cant" placeholder="Cantidad usada">
-        <button style="background: #e67e22;" onclick="registrarGasto()">CARGAR GASTO</button>
+        <button id="btnGasto" style="background: #e67e22;">CARGAR GASTO</button>
     </div>
 
     <div class="box">
@@ -53,103 +55,135 @@
         <div>EN STOCK: <b id="r_stock">$0</b></div>
     </div>
 
-    <button onclick="reiniciarTodo()" style="background: #c0392b; margin-top: 20px; width: 100%;">?? RESETEAR SISTEMA (Borrar errores de memoria)</button>
+    <button id="btnReset" style="background: #c0392b; margin-top: 20px; width: 100%;">⚠️ RESETEAR SISTEMA (Borra nube)</button>
 
-<script>
-    // Usamos una clave totalmente nueva para evitar conflictos
-    var CLAVE = "DATA_STOCK_V100";
-    var db = JSON.parse(localStorage.getItem(CLAVE)) || { compras: [], gastos: [] };
+    <script type="module">
+        // Importación de módulos Firebase
+        import { initializeApp } from "https://gstatic.com";
+        import { getDatabase, ref, set, push, onValue, remove } from "https://gstatic.com";
 
-    window.onload = function() {
-        document.getElementById('f_fecha').valueAsDate = new Date();
-        dibujarTodo();
-    };
+        // Tu configuración de Insumex
+        const firebaseConfig = {
+            apiKey: "AIzaSyCDnMHlcO9JME_CBQDrawKGU6t1GIfGKWU",
+            authDomain: "insumex-a02f5.firebaseapp.com",
+            projectId: "insumex-a02f5",
+            storageBucket: "insumex-a02f5.firebasestorage.app",
+            messagingSenderId: "478815059725",
+            appId: "1:478815059725:web:7fbb95307cab1fc86eba44",
+            databaseURL: "https://firebaseio.com" // URL deducida del ID
+        };
 
-    function registrarCompra() {
-        var nom = document.getElementById("f_nombre").value.toUpperCase().trim();
-        var tot = parseFloat(document.getElementById("f_total").value);
-        var can = parseFloat(document.getElementById("f_cant").value);
-        var fec = document.getElementById("f_fecha").value;
-        var uni = document.getElementById("f_unid").value;
+        // Inicialización
+        const app = initializeApp(firebaseConfig);
+        const db_firebase = getDatabase(app);
+        const stockRef = ref(db_firebase, 'inventario');
 
-        if(!nom || isNaN(tot) || isNaN(can)) { alert("Completa todos los campos con números"); return; }
+        let db_local = { compras: {}, gastos: {} };
 
-        db.compras.push({ f: fec, n: nom, t: tot, c: can, u: uni, precioUnit: (tot/can) });
-        actualizar();
-        document.getElementById("f_nombre").value = "";
-        document.getElementById("f_total").value = "";
-        document.getElementById("f_cant").value = "";
-    }
-
-    function registrarGasto() {
-        var nom = document.getElementById("sel_insumos").value;
-        var can = parseFloat(document.getElementById("g_cant").value);
-
-        if(!nom || isNaN(can)) { alert("Selecciona insumo y cantidad"); return; }
-
-        db.gastos.push({ n: nom, c: can });
-        actualizar();
-        document.getElementById("g_cant").value = "";
-    }
-
-    function actualizar() {
-        localStorage.setItem(CLAVE, JSON.stringify(db));
-        dibujarTodo();
-    }
-
-    function reiniciarTodo() {
-        if(confirm("¿Borrar todo y empezar de cero?")) {
-            localStorage.removeItem(CLAVE);
-            db = { compras: [], gastos: [] };
+        // Sincronización en tiempo real
+        onValue(stockRef, (snapshot) => {
+            const data = snapshot.val();
+            document.getElementById("conexion-status").innerText = "✅ Conectado a Insumex Cloud";
+            if (data) {
+                db_local.compras = data.compras || {};
+                db_local.gastos = data.gastos || {};
+            } else {
+                db_local = { compras: {}, gastos: {} };
+            }
             dibujarTodo();
-        }
-    }
+        }, (error) => {
+            document.getElementById("conexion-status").innerText = "❌ Error: " + error.message;
+        });
 
-    function dibujarTodo() {
-        var t_compras = document.querySelector("#tabla_compras tbody");
-        var t_stock = document.querySelector("#tabla_stock tbody");
-        var sel = document.getElementById("sel_insumos");
-        
-        t_compras.innerHTML = ""; t_stock.innerHTML = "";
-        sel.innerHTML = '<option value="">-- Seleccionar --</option>';
+        window.onload = () => document.getElementById('f_fecha').valueAsDate = new Date();
 
-        var sumC = 0; var sumG = 0; var sumS = 0;
-        var inv = {};
+        // Lógica de Compras
+        document.getElementById("btnCompra").onclick = () => {
+            const nom = document.getElementById("f_nombre").value.toUpperCase().trim();
+            const tot = parseFloat(document.getElementById("f_total").value);
+            const can = parseFloat(document.getElementById("f_cant").value);
+            const fec = document.getElementById("f_fecha").value;
+            const uni = document.getElementById("f_unid").value;
 
-        // Procesar Compras
-        for(var i=0; i<db.compras.length; i++) {
-            var c = db.compras[i];
-            sumC += c.t;
-            t_compras.innerHTML += "<tr><td>"+c.f+"</td><td>"+c.n+"</td><td>"+c.c+c.u+"</td><td>$"+c.t+"</td></tr>";
+            if(!nom || isNaN(tot) || isNaN(can)) return alert("Por favor, completa todos los campos.");
+
+            const itemRef = push(ref(db_firebase, 'inventario/compras'));
+            set(itemRef, { f: fec, n: nom, t: tot, c: can, u: uni, precioUnit: (tot/can) });
+
+            // Limpiar campos
+            document.getElementById("f_nombre").value = "";
+            document.getElementById("f_total").value = "";
+            document.getElementById("f_cant").value = "";
+        };
+
+        // Lógica de Gastos
+        document.getElementById("btnGasto").onclick = () => {
+            const nom = document.getElementById("sel_insumos").value;
+            const can = parseFloat(document.getElementById("g_cant").value);
+
+            if(!nom || isNaN(can)) return alert("Selecciona un insumo y la cantidad usada.");
+
+            const gastoRef = push(ref(db_firebase, 'inventario/gastos'));
+            set(gastoRef, { n: nom, c: can });
+
+            document.getElementById("g_cant").value = "";
+        };
+
+        // Reset
+        document.getElementById("btnReset").onclick = () => {
+            if(confirm("¿Estás seguro? Esto eliminará todos los datos de la nube definitivamente.")) {
+                remove(stockRef);
+            }
+        };
+
+        function dibujarTodo() {
+            const t_compras = document.querySelector("#tabla_compras tbody");
+            const t_stock = document.querySelector("#tabla_stock tbody");
+            const sel = document.getElementById("sel_insumos");
             
-            if(!inv[c.n]) inv[c.n] = { comp: 0, gast: 0, precio: c.precioUnit, med: c.u };
-            inv[c.n].comp += c.c;
+            t_compras.innerHTML = ""; t_stock.innerHTML = "";
+            sel.innerHTML = '<option value="">-- Seleccionar --</option>';
+
+            let sumC = 0, sumG = 0, sumS = 0;
+            let inv = {};
+
+            // Renderizar Compras
+            Object.values(db_local.compras).forEach(c => {
+                sumC += c.t;
+                t_compras.innerHTML += `<tr><td>${c.f}</td><td>${c.n}</td><td>${c.c}${c.u}</td><td>$${c.t.toFixed(2)}</td></tr>`;
+                
+                if(!inv[c.n]) inv[c.n] = { comp: 0, gast: 0, precio: c.precioUnit, med: c.u };
+                inv[c.n].comp += c.c;
+            });
+
+            // Renderizar Gastos
+            Object.values(db_local.gastos).forEach(g => {
+                if(inv[g.n]) inv[g.n].gast += g.c;
+            });
+
+            // Renderizar Stock y Selector
+            Object.keys(inv).sort().forEach(n => {
+                const item = inv[n];
+                const stock = item.comp - item.gast;
+                const valS = stock * item.precio;
+                sumG += (item.gast * item.precio);
+                sumS += valS;
+
+                sel.innerHTML += `<option value="${n}">${n}</option>`;
+                t_stock.innerHTML += `
+                    <tr>
+                        <td><b>${n}</b></td>
+                        <td>${item.comp.toFixed(2)}</td>
+                        <td style='color:red'>-${item.gast.toFixed(2)}</td>
+                        <td>${stock.toFixed(2)} ${item.med}</td>
+                        <td style='color:green'>$${valS.toFixed(2)}</td>
+                    </tr>`;
+            });
+
+            document.getElementById("r_compras").innerText = "$" + sumC.toFixed(2);
+            document.getElementById("r_gastado").innerText = "$" + sumG.toFixed(2);
+            document.getElementById("r_stock").innerText = "$" + sumS.toFixed(2);
         }
-
-        // Procesar Gastos
-        for(var j=0; j<db.gastos.length; j++) {
-            var g = db.gastos[j];
-            if(inv[g.n]) inv[g.n].gast += g.c;
-        }
-
-        // Dibujar Stock y Llenar Selector
-        var nombres = Object.keys(inv);
-        for(var k=0; k<nombres.length; k++) {
-            var n = nombres[k];
-            var item = inv[n];
-            var stock = item.comp - item.gast;
-            var valS = stock * item.precio;
-            sumG += (item.gast * item.precio);
-            sumS += valS;
-
-            sel.innerHTML += '<option value="'+n+'">'+n+'</option>';
-            t_stock.innerHTML += "<tr><td><b>"+n+"</b></td><td>"+item.comp+"</td><td style='color:red'>-"+item.gast+"</td><td>"+stock.toFixed(2)+" "+item.med+"</td><td style='color:green'>$"+valS.toFixed(2)+"</td></tr>";
-        }
-
-        document.getElementById("r_compras").innerText = "$" + sumC.toFixed(2);
-        document.getElementById("r_gastado").innerText = "$" + sumG.toFixed(2);
-        document.getElementById("r_stock").innerText = "$" + sumS.toFixed(2);
-    }
-</script>
+    </script>
 </body>
 </html>
