@@ -2,233 +2,225 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kiko's Burguer - Admin Pro</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <title>Control de Stock - HambuCloud Chibi</title>
     <style>
         :root {
-            --kiko-neon-red: #ff003c;
-            --kiko-neon-yellow: #ffbd00;
-            --glass-bg: rgba(255, 255, 255, 0.85);
+            --primary: #2196f3; /* Azul Francia */
+            --accent: #ff9800;
+            --dark: #2c3e50;
         }
 
-        body {
-            /* Fondo de hamburguesa realista */
-            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), 
-                        url('https://images.unsplash.com/photo-1571091718767-18b5b1457add?q=80&w=2072&auto=format&fit=crop');
-            background-size: cover;
-            background-attachment: fixed;
-            background-position: center;
-            font-family: 'Segoe UI', Roboto, sans-serif;
-            min-height: 100vh;
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            /* Fondo con imagen estilo Chibi (Hamburguesas y Números) */
+            background: linear-gradient(rgba(255,255,255,0.9), rgba(255,255,255,0.9)), 
+                        url('https://freepik.com');
+            background-size: 300px;
+            padding: 20px; 
+            margin: 0;
         }
 
-        .navbar {
-            background: var(--kiko-neon-red) !important;
-            box-shadow: 0 4px 15px rgba(255, 0, 60, 0.4);
-            border-radius: 0 0 25px 25px;
+        .container { max-width: 1000px; margin: auto; }
+
+        .box { 
+            background: rgba(255, 255, 255, 0.95); 
+            padding: 25px; 
+            border-radius: 15px; 
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1); 
+            margin-bottom: 25px; 
+            border-top: 6px solid var(--dark); 
         }
 
-        .card {
-            background: var(--glass-bg);
-            backdrop-filter: blur(10px);
-            border: none;
-            border-radius: 30px; /* Bordes muy redondeados */
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            margin-bottom: 25px;
-            overflow: hidden;
-        }
+        h1 { text-align: center; color: var(--dark); text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; color: var(--dark); font-size: 1.2rem; border-bottom: 2px solid #eee; padding-bottom: 10px; }
 
-        .card-header {
-            background: var(--kiko-neon-yellow) !important;
-            color: #000;
-            font-weight: 900;
-            text-transform: uppercase;
-            text-align: center;
-            border: none;
-            padding: 15px;
-        }
+        input, select, button { padding: 12px; margin: 5px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
+        
+        button { cursor: pointer; font-weight: bold; border: none; color: white; transition: 0.3s; }
+        .btn-green { background: #27ae60; }
+        .btn-green:hover { background: #219150; }
+        
+        .btn-blue { background: #0056b3; } /* Azul Francia */
+        .btn-blue:hover { background: #004494; }
 
-        .btn-kiko {
-            background: var(--kiko-neon-red);
-            color: white;
-            border-radius: 50px;
-            font-weight: bold;
-            padding: 12px;
-            transition: 0.3s;
-            border: none;
-            text-transform: uppercase;
-        }
+        .btn-del { background: #e74c3c; padding: 5px 10px; font-size: 12px; }
+        .btn-del:hover { background: #c0392b; }
 
-        .btn-kiko:hover {
-            background: #ff4d6d;
-            transform: scale(1.05);
-            color: white;
-        }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border-radius: 8px; overflow: hidden; }
+        th { background: var(--dark); color: white; text-align: left; padding: 12px; font-size: 13px; }
+        td { padding: 12px; border-bottom: 1px solid #eee; color: #333; }
+        tr:hover { background: #f9f9f9; }
 
-        .table { background: transparent; }
-        .badge-price {
-            background: #2ecc71;
-            font-size: 1.1rem;
-            border-radius: 10px;
-            padding: 8px 12px;
+        .resumen { 
+            display: flex; 
+            justify-content: space-around; 
+            background: var(--dark); 
+            color: white; 
+            padding: 25px; 
+            border-radius: 15px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
+        .resumen div { text-align: center; font-weight: bold; }
+        .resumen b { display: block; font-size: 1.8rem; color: #ffeb3b; margin-top: 5px; }
 
-        input.form-control {
-            border-radius: 15px;
-            border: 2px solid #eee;
-            padding: 10px 15px;
-        }
-
-        input.form-control:focus {
-            border-color: var(--kiko-neon-yellow);
-            box-shadow: none;
-        }
+        .stock-tag { background: #eee; padding: 4px 8px; border-radius: 5px; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<nav class="navbar navbar-dark mb-5">
-    <div class="container justify-content-center">
-        <h2 class="navbar-brand m-0 fw-bold" style="font-size: 1.8rem;">🍔 KIKO'S BURGUER ADMIN</h2>
-    </div>
-</nav>
-
 <div class="container">
-    <div class="row">
-        <div class="col-lg-4">
-            <div class="card">
-                <div class="card-header">🛒 Cargar Insumo</div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Nombre</label>
-                        <input type="text" id="ing-nombre" class="form-control" placeholder="Ej: Medallón 180g">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Precio ($)</label>
-                        <input type="number" id="ing-precio" class="form-control" placeholder="0.00">
-                    </div>
-                    <button onclick="guardarIngrediente()" class="btn btn-kiko w-100">Guardar</button>
-                </div>
-            </div>
+    <h1>🍔 Inventario Burger Chibi 📊</h1>
 
-            <div class="card">
-                <div class="card-header text-dark" style="background: #fff !important;">Lista de Precios</div>
-                <div class="card-body p-0">
-                    <ul class="list-group list-group-flush" id="lista-ingredientes">
-                        </ul>
-                </div>
-            </div>
+    <!-- 1. REGISTRO DE COMPRAS -->
+    <div class="box">
+        <h2>1. Registrar Compra de Insumos</h2>
+        <div style="display: flex; flex-wrap: wrap;">
+            <input type="date" id="f_fecha">
+            <input type="text" id="f_nombre" placeholder="¿Qué compraste? (ej: Pan)" style="flex: 2;">
+            <input type="number" id="f_total" placeholder="Costo Total $">
+            <input type="number" id="f_cant" placeholder="Cantidad">
+            <select id="f_unid"><option value="kg">kg</option><option value="un">un</option></select>
+            <button class="btn-green" onclick="registrarCompra()">REGISTRAR COMPRA</button>
         </div>
+        
+        <table>
+            <thead><tr><th>Fecha</th><th>Insumo</th><th>Cantidad</th><th>Total</th><th>Acción</th></tr></thead>
+            <tbody id="tabla_compras"></tbody>
+        </table>
+    </div>
 
-        <div class="col-lg-8">
-            <div class="card">
-                <div class="card-header" style="background: #25d366 !important; color: white;">⚡ Calcular Costo de Hamburguesa</div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Nombre de la Burger</label>
-                            <input type="text" id="prod-nombre" class="form-control" placeholder="Ej: La Kiko Monster">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold">Ingredientes (ID=Cant, ID=Cant)</label>
-                            <input type="text" id="prod-receta" class="form-control" placeholder="Ej: 1=1, 2=150">
-                        </div>
-                    </div>
-                    <button onclick="calcularProducto()" class="btn btn-dark w-100 mb-2" style="border-radius: 50px;">CALCULAR COSTO</button>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead class="table-dark">
-                            <tr>
-                                <th class="ps-4">Hamburguesa</th>
-                                <th>Costo Final</th>
-                                <th class="text-center">Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabla-productos">
-                            </tbody>
-                    </table>
-                </div>
-            </div>
+    <!-- 2. REGISTRO DE GASTOS -->
+    <div class="box">
+        <h2>2. Registrar Gasto Diario</h2>
+        <div style="display: flex; flex-wrap: wrap; align-items: center;">
+            <select id="sel_insumos" style="flex: 2; border: 2px solid #0056b3;"><option value="">-- Seleccionar Insumo --</option></select>
+            <input type="number" id="g_cant" placeholder="Cantidad usada">
+            <button class="btn-blue" onclick="registrarGasto()">CARGAR GASTO</button>
         </div>
+    </div>
+
+    <!-- 3. STOCK FINAL -->
+    <div class="box">
+        <h2>3. Stock en Heladera y Valorización</h2>
+        <table>
+            <thead><tr><th>Insumo</th><th>Comprado</th><th>Gastado</th><th>En Stock</th><th>Valor Stock</th><th>Limpiar</th></tr></thead>
+            <tbody id="tabla_stock"></tbody>
+        </table>
+    </div>
+
+    <!-- RESUMEN CONTABLE -->
+    <div class="resumen">
+        <div>SALIDA TOTAL (COMPRAS)<b id="r_compras">$0.00</b></div>
+        <div>VALOR CONSUMIDO<b id="r_gastado">$0.00</b></div>
+        <div>VALOR EN MERCADERÍA<b id="r_stock">$0.00</b></div>
     </div>
 </div>
 
 <script>
-    // Usamos el almacenamiento del navegador (localStorage) en lugar de SQL
-    // para que funcione 100% en GitHub Pages sin errores.
-    let ingredientes = JSON.parse(localStorage.getItem('kiko_ings')) || [];
-    let productos = JSON.parse(localStorage.getItem('kiko_prods')) || [];
+    const CLAVE = "HAMBU_CHIBI_DATA_V1";
+    let db = JSON.parse(localStorage.getItem(CLAVE)) || { compras: [], gastos: [] };
 
-    function guardarIngrediente() {
-        const nombre = document.getElementById('ing-nombre').value;
-        const precio = document.getElementById('ing-precio').value;
-        
-        if(!nombre || !precio) return alert("Completa los datos");
+    window.onload = function() {
+        document.getElementById('f_fecha').valueAsDate = new Date();
+        dibujarTodo();
+    };
 
-        const nuevo = { id: ingredientes.length + 1, nombre, precio: parseFloat(precio) };
-        ingredientes.push(nuevo);
-        localStorage.setItem('kiko_ings', JSON.stringify(ingredientes));
-        actualizarUI();
-        document.getElementById('ing-nombre').value = '';
-        document.getElementById('ing-precio').value = '';
+    function registrarCompra() {
+        const nom = document.getElementById("f_nombre").value.toUpperCase().trim();
+        const tot = parseFloat(document.getElementById("f_total").value);
+        const can = parseFloat(document.getElementById("f_cant").value);
+        const fec = document.getElementById("f_fecha").value;
+        const uni = document.getElementById("f_unid").value;
+
+        if(!nom || isNaN(tot) || isNaN(can)) { alert("Completa todos los campos correctamente"); return; }
+
+        db.compras.push({ f: fec, n: nom, t: tot, c: can, u: uni, pu: (tot/can) });
+        actualizar();
+        document.getElementById("f_nombre").value = "";
+        document.getElementById("f_total").value = "";
+        document.getElementById("f_cant").value = "";
     }
 
-    function calcularProducto() {
-        const nombre = document.getElementById('prod-nombre').value;
-        const recetaRaw = document.getElementById('prod-receta').value;
+    function registrarGasto() {
+        const nom = document.getElementById("sel_insumos").value;
+        const can = parseFloat(document.getElementById("g_cant").value);
 
-        if(!nombre || !recetaRaw) return alert("Completa los datos");
+        if(!nom || isNaN(can)) { alert("Selecciona insumo y cantidad consumida"); return; }
 
-        let costoTotal = 0;
-        const partes = recetaRaw.split(',');
-
-        partes.forEach(p => {
-            const [id, cant] = p.split('=');
-            const ing = ingredientes.find(i => i.id == id.trim());
-            if(ing) costoTotal += (ing.precio * parseFloat(cant));
-        });
-
-        productos.push({ nombre, costo: costoTotal });
-        localStorage.setItem('kiko_prods', JSON.stringify(productos));
-        actualizarUI();
+        db.gastos.push({ n: nom, c: can });
+        actualizar();
+        document.getElementById("g_cant").value = "";
     }
 
-    function borrarTodo() {
-        if(confirm("¿Borrar todo?")) {
-            localStorage.clear();
-            location.reload();
+    function borrarFilaCompra(idx) {
+        if(confirm("¿Eliminar este registro de compra?")) {
+            db.compras.splice(idx, 1);
+            actualizar();
         }
     }
 
-    function actualizarUI() {
-        // Actualizar Lista Ingredientes
-        const lista = document.getElementById('lista-ingredientes');
-        lista.innerHTML = ingredientes.map(i => `
-            <li class="list-group-item d-flex justify-content-between p-3">
-                <span><strong>ID ${i.id}:</strong> ${i.nombre}</span>
-                <span class="badge bg-dark">$${i.precio}</span>
-            </li>
-        `).join('');
-
-        // Actualizar Tabla Productos
-        const tabla = document.getElementById('tabla-productos');
-        tabla.innerHTML = productos.map(p => `
-            <tr>
-                <td class="ps-4 fw-bold text-uppercase">${p.nombre}</td>
-                <td><span class="badge badge-price">$${p.costo.toFixed(2)}</span></td>
-                <td class="text-center"><button class="btn btn-sm btn-danger rounded-circle" onclick="alert('Funcionalidad de borrar en desarrollo')">×</button></td>
-            </tr>
-        `).join('');
+    function borrarInsumoCompleto(nombre) {
+        if(confirm(`¿Quieres borrar TODO el historial de "${nombre}"?`)) {
+            db.compras = db.compras.filter(c => c.n !== nombre);
+            db.gastos = db.gastos.filter(g => g.n !== nombre);
+            actualizar();
+        }
     }
 
-    actualizarUI();
-</script>
+    function actualizar() {
+        localStorage.setItem(CLAVE, JSON.stringify(db));
+        dibujarTodo();
+    }
 
+    function dibujarTodo() {
+        const t_c = document.querySelector("#tabla_compras tbody");
+        const t_s = document.querySelector("#tabla_stock tbody");
+        const sel = document.getElementById("sel_insumos");
+        
+        t_c.innerHTML = ""; t_s.innerHTML = "";
+        sel.innerHTML = '<option value="">-- Seleccionar --</option>';
+
+        let s_compras = 0; let s_gastado = 0; let s_stock = 0;
+        let inv = {};
+
+        // 1. Cargar Compras
+        db.compras.forEach((c, idx) => {
+            s_compras += c.t;
+            t_c.innerHTML += `<tr><td>${c.f}</td><td>${c.n}</td><td>${c.c} ${c.u}</td><td>$${c.t.toFixed(2)}</td><td><button class="btn-del" onclick="borrarFilaCompra(${idx})">Eliminar</button></td></tr>`;
+            
+            if(!inv[c.n]) inv[c.n] = { comp: 0, gast: 0, precio: c.pu, med: c.u };
+            inv[c.n].comp += c.c;
+        });
+
+        // 2. Cargar Gastos
+        db.gastos.forEach(g => {
+            if(inv[g.n]) inv[g.n].gast += g.c;
+        });
+
+        // 3. Stock y Selector
+        Object.keys(inv).sort().forEach(nombre => {
+            const i = inv[nombre];
+            const stock = i.comp - i.gast;
+            const val_s = stock * i.precio;
+            s_gastado += (i.gast * i.precio);
+            s_stock += val_s;
+
+            sel.innerHTML += `<option value="${nombre}">${nombre}</option>`;
+            t_s.innerHTML += `
+                <tr>
+                    <td><b>${nombre}</b></td>
+                    <td>${i.comp.toFixed(2)}</td>
+                    <td style="color:red">-${i.gast.toFixed(2)}</td>
+                    <td><span class="stock-tag">${stock.toFixed(2)} ${i.med}</span></td>
+                    <td style="color:green; font-weight:bold">$${val_s.toFixed(2)}</td>
+                    <td><button class="btn-del" onclick="borrarInsumoCompleto('${nombre}')">Limpiar</button></td>
+                </tr>`;
+        });
+
+        document.getElementById("r_compras").innerText = "$" + s_compras.toFixed(2);
+        document.getElementById("r_gastado").innerText = "$" + s_gastado.toFixed(2);
+        document.getElementById("r_stock").innerText = "$" + s_stock.toFixed(2);
+    }
+</script>
 </body>
 </html>
