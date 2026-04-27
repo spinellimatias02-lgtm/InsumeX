@@ -29,7 +29,15 @@
     <button onclick="registrarCompra()">REGISTRAR COMPRA</button>
 
     <table id="tabla_compras">
-        <thead><tr><th>Fecha</th><th>Insumo</th><th>Cant.</th><th>Total</th></tr></thead>
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Insumo</th>
+                <th>Cant.</th>
+                <th>Total</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
         <tbody></tbody>
     </table>
 </div>
@@ -57,7 +65,6 @@
 
 <button onclick="reiniciarTodo()" style="background:red;width:100%">RESETEAR</button>
 
-<!-- 🔥 FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
@@ -74,10 +81,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-
-window.db = db;
-
-/* ================= FUNCIONES ================= */
 
 window.onload = function() {
     document.getElementById('f_fecha').valueAsDate = new Date();
@@ -115,6 +118,12 @@ window.registrarGasto = function() {
     });
 };
 
+window.eliminarCompra = function(id) {
+    if(confirm("¿Eliminar compra?")) {
+        remove(ref(db, "compras/" + id));
+    }
+};
+
 window.reiniciarTodo = function() {
     if(confirm("¿Borrar todo?")) {
         remove(ref(db, "compras"));
@@ -122,26 +131,22 @@ window.reiniciarTodo = function() {
     }
 };
 
-/* ================= REALTIME ================= */
-
 function iniciarRealtime() {
     let compras = [];
     let gastos = [];
 
     onValue(ref(db, "compras"), (snap) => {
         compras = [];
-        snap.forEach(c => compras.push(c.val()));
+        snap.forEach(c => compras.push({ id: c.key, ...c.val() }));
         render(compras, gastos);
     });
 
     onValue(ref(db, "gastos"), (snap) => {
         gastos = [];
-        snap.forEach(g => gastos.push(g.val()));
+        snap.forEach(g => gastos.push({ id: g.key, ...g.val() }));
         render(compras, gastos);
     });
 }
-
-/* ================= TU LOGICA ORIGINAL ================= */
 
 function render(compras, gastos) {
 
@@ -158,8 +163,15 @@ function render(compras, gastos) {
     for(var i=0; i<compras.length; i++) {
         var c = compras[i];
         sumC += c.t;
-        t_compras.innerHTML += `<tr><td>${c.f}</td><td>${c.n}</td><td>${c.c}${c.u}</td><td>$${c.t}</td></tr>`;
-        
+
+        t_compras.innerHTML += `<tr>
+            <td>${c.f}</td>
+            <td>${c.n}</td>
+            <td>${c.c}${c.u}</td>
+            <td>$${c.t}</td>
+            <td><button onclick="eliminarCompra('${c.id}')" style="background:red">X</button></td>
+        </tr>`;
+
         if(!inv[c.n]) inv[c.n] = { comp: 0, gast: 0, precio: c.precioUnit, med: c.u };
         inv[c.n].comp += c.c;
     }
@@ -193,7 +205,6 @@ function render(compras, gastos) {
     document.getElementById("r_gastado").innerText = "$" + sumG.toFixed(2);
     document.getElementById("r_stock").innerText = "$" + sumS.toFixed(2);
 }
-
 </script>
 
 </body>
