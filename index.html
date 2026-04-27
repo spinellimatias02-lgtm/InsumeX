@@ -2,12 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>SISTEMA INSUMEX - STOCK (V8)</title>
-    
-    <!-- Cargamos las librerías de Firebase estilo antiguo (Versión 8) -->
-    <script src="https://gstatic.com"></script>
-    <script src="https://gstatic.com"></script>
-
+    <title>SISTEMA INSUMEX</title>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
         .box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; border-top: 5px solid #2c3e50; }
@@ -21,8 +16,8 @@
 </head>
 <body>
 
-    <h1>📦 Insumex: Control de Stock (Estilo V8)</h1>
-    <div id="conexion-status" class="status" style="color: orange;">⏳ Conectando...</div>
+    <h1>📦 Insumex: Inventario</h1>
+    <div id="conexion-status" class="status" style="color: orange;">⏳ Intentando conectar con la nube...</div>
 
     <div class="box">
         <h2>1. Registrar Compra</h2>
@@ -62,8 +57,11 @@
 
     <button onclick="resetearTodo()" style="background: #c0392b; margin-top: 20px; width: 100%;">⚠️ RESETEAR SISTEMA (Borra nube)</button>
 
+    <!-- Cargamos Firebase justo antes de cerrar el body para evitar errores de carga -->
+    <script src="https://gstatic.com"></script>
+    <script src="https://gstatic.com"></script>
+
 <script>
-    // Configuración conectada a tu INSUMEX
     const firebaseConfig = {
         apiKey: "AIzaSyCDnMHlcO9JME_CBQDrawKGU6t1GIfGKWU",
         authDomain: "://firebaseapp.com",
@@ -74,31 +72,29 @@
         databaseURL: "https://firebaseio.com"
     };
 
-    // Inicializamos Firebase con el estilo viejo
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-    const refInventario = db.ref("inventario");
+    // Inicialización segura
+    var db;
+    var refInventario;
+    var baseDeDatos = { compras: {}, gastos: {} };
 
-    let baseDeDatos = { compras: {}, gastos: {} };
+    try {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+        refInventario = db.ref("inventario");
 
-    // Escuchar cambios en tiempo real
-    refInventario.on("value", (snapshot) => {
-        const data = snapshot.val();
-        document.getElementById("conexion-status").innerText = "✅ Conectado a Insumex (Modo V8)";
-        document.getElementById("conexion-status").style.color = "green";
-        
-        if (data) {
-            baseDeDatos.compras = data.compras || {};
-            baseDeDatos.gastos = data.gastos || {};
-        } else {
-            baseDeDatos = { compras: {}, gastos: {} };
-        }
-        dibujarTodo();
-    });
+        refInventario.on("value", (snapshot) => {
+            const data = snapshot.val();
+            document.getElementById("conexion-status").innerText = "✅ SISTEMA CONECTADO";
+            document.getElementById("conexion-status").style.color = "green";
+            baseDeDatos = data ? { compras: data.compras || {}, gastos: data.gastos || {} } : { compras: {}, gastos: {} };
+            dibujarTodo();
+        });
+    } catch (e) {
+        document.getElementById("conexion-status").innerText = "❌ Error de conexión. Revisa tu internet o bloqueadores.";
+        console.error(e);
+    }
 
-    window.onload = function() {
-        document.getElementById('f_fecha').valueAsDate = new Date();
-    };
+    window.onload = function() { document.getElementById('f_fecha').valueAsDate = new Date(); };
 
     function registrarCompra() {
         var nom = document.getElementById("f_nombre").value.toUpperCase().trim();
@@ -108,77 +104,46 @@
         var uni = document.getElementById("f_unid").value;
 
         if(!nom || isNaN(tot) || isNaN(can)) { alert("Completa los campos"); return; }
+        if(!db) { alert("Aún no hay conexión"); return; }
 
-        // Guardar en la nube
-        db.ref("inventario/compras").push({
-            f: fec, n: nom, t: tot, c: can, u: uni, precioUnit: (tot/can)
-        });
-
-        document.getElementById("f_nombre").value = "";
-        document.getElementById("f_total").value = "";
-        document.getElementById("f_cant").value = "";
+        db.ref("inventario/compras").push({ f: fec, n: nom, t: tot, c: can, u: uni, precioUnit: (tot/can) });
+        document.getElementById("f_nombre").value = ""; document.getElementById("f_total").value = ""; document.getElementById("f_cant").value = "";
     }
 
     function registrarGasto() {
         var nom = document.getElementById("sel_insumos").value;
         var can = parseFloat(document.getElementById("g_cant").value);
-
-        if(!nom || isNaN(can)) { alert("Selecciona insumo y cantidad"); return; }
-
-        // Guardar gasto en la nube
+        if(!nom || isNaN(can)) { alert("Selecciona insumo"); return; }
         db.ref("inventario/gastos").push({ n: nom, c: can });
         document.getElementById("g_cant").value = "";
     }
 
-    function resetearTodo() {
-        if(confirm("¿Borrar todo definitivamente?")) {
-            refInventario.remove();
-        }
-    }
+    function resetearTodo() { if(confirm("¿Borrar todo?")) refInventario.remove(); }
 
     function dibujarTodo() {
         var t_compras = document.querySelector("#tabla_compras tbody");
         var t_stock = document.querySelector("#tabla_stock tbody");
         var sel = document.getElementById("sel_insumos");
-        
         t_compras.innerHTML = ""; t_stock.innerHTML = "";
-        var valorActualSel = sel.value;
+        var valorActual = sel.value;
         sel.innerHTML = '<option value="">-- Seleccionar --</option>';
+        var sumC = 0, sumG = 0, sumS = 0, inv = {};
 
-        var sumC = 0; var sumG = 0; var sumS = 0;
-        var inv = {};
-
-        // Procesar Compras
-        var listaCompras = Object.values(baseDeDatos.compras);
-        for(var i=0; i < listaCompras.length; i++) {
-            var c = listaCompras[i];
+        Object.values(baseDeDatos.compras).forEach(c => {
             sumC += c.t;
             t_compras.innerHTML += "<tr><td>"+c.f+"</td><td>"+c.n+"</td><td>"+c.c+c.u+"</td><td>$"+c.t.toFixed(2)+"</td></tr>";
-            
             if(!inv[c.n]) inv[c.n] = { comp: 0, gast: 0, precio: c.precioUnit, med: c.u };
             inv[c.n].comp += c.c;
-        }
+        });
 
-        // Procesar Gastos
-        var listaGastos = Object.values(baseDeDatos.gastos);
-        for(var j=0; j < listaGastos.length; j++) {
-            var g = listaGastos[j];
-            if(inv[g.n]) inv[g.n].gast += g.c;
-        }
+        Object.values(baseDeDatos.gastos).forEach(g => { if(inv[g.n]) inv[g.n].gast += g.c; });
 
-        // Dibujar Stock
-        var nombres = Object.keys(inv).sort();
-        for(var k=0; k < nombres.length; k++) {
-            var n = nombres[k];
-            var item = inv[n];
-            var stock = item.comp - item.gast;
-            var valS = stock * item.precio;
-            sumG += (item.gast * item.precio);
-            sumS += valS;
-
-            sel.innerHTML += '<option value="'+n+'" '+(n == valorActualSel ? "selected" : "")+'>'+n+'</option>';
+        Object.keys(inv).sort().forEach(n => {
+            var item = inv[n], stock = item.comp - item.gast, valS = stock * item.precio;
+            sumG += (item.gast * item.precio); sumS += valS;
+            sel.innerHTML += '<option value="'+n+'" '+(n == valorActual ? "selected" : "")+'>'+n+'</option>';
             t_stock.innerHTML += "<tr><td><b>"+n+"</b></td><td>"+item.comp.toFixed(2)+"</td><td style='color:red'>-"+item.gast.toFixed(2)+"</td><td>"+stock.toFixed(2)+" "+item.med+"</td><td style='color:green'>$"+valS.toFixed(2)+"</td></tr>";
-        }
+        });
 
         document.getElementById("r_compras").innerText = "$" + sumC.toFixed(2);
         document.getElementById("r_gastado").innerText = "$" + sumG.toFixed(2);
