@@ -61,7 +61,6 @@ th, td {
     border-radius:8px;
 }
 
-/* PC */
 @media(min-width:700px){
     .flex {
         display:flex;
@@ -80,7 +79,7 @@ th, td {
 
 <body>
 
-<h1>?? Inventario</h1>
+<h1>📦 Inventario</h1>
 
 <div class="box">
 <h2>Compra</h2>
@@ -249,6 +248,12 @@ window.editarGasto = (g)=>{
     editandoGasto = g.id;
 };
 
+window.eliminarGasto = (id)=>{
+    if(confirm("Eliminar gasto?")){
+        remove(ref(db,"gastos/"+id));
+    }
+};
+
 window.eliminarCompra = (id)=>{
     remove(ref(db,"compras/"+id));
 };
@@ -291,7 +296,10 @@ function render(){
         <tr>
         <td>${g.n}</td>
         <td>${g.c}</td>
-        <td><button onclick='editarGasto(${JSON.stringify(g)})'>Editar</button></td>
+        <td>
+            <button onclick='editarGasto(${JSON.stringify(g)})'>Editar</button>
+            <button class="red" onclick="eliminarGasto('${g.id}')">X</button>
+        </td>
         </tr>`;
     });
 
