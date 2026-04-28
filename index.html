@@ -5,28 +5,102 @@
 <title>SISTEMA DE STOCK</title>
 
 <style>
-body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
-.box { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-input, select, button { padding: 10px; margin: 5px; }
-button { background: #27ae60; color: white; border: none; cursor: pointer; }
-table { width: 100%; border-collapse: collapse; }
-th, td { padding: 10px; border-bottom: 1px solid #ddd; }
-.resumen { display:flex; justify-content:space-around; background:#2c3e50; color:white; padding:10px;}
+body {
+    font-family: sans-serif;
+    background: #f0f2f5;
+    padding: 10px;
+    margin:0;
+}
+
+h1 { text-align:center; }
+
+.box {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+input, select, button {
+    padding: 10px;
+    margin: 5px 0;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 16px;
+}
+
+button {
+    background: #27ae60;
+    color: white;
+    border: none;
+    border-radius: 6px;
+}
+
+button.red { background:red; }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top:10px;
+}
+
+th, td {
+    padding: 8px;
+    border-bottom: 1px solid #ddd;
+    text-align:center;
+    font-size:14px;
+}
+
+.resumen {
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+    background:#2c3e50;
+    color:white;
+    padding:10px;
+    border-radius:8px;
+}
+
+/* PC */
+@media(min-width:700px){
+    .flex {
+        display:flex;
+        gap:10px;
+    }
+    .flex input, .flex select {
+        flex:1;
+    }
+    .resumen {
+        flex-direction:row;
+        justify-content:space-around;
+    }
+}
 </style>
 </head>
 
 <body>
 
-<h1>📦 Inventario</h1>
+<h1>?? Inventario</h1>
 
 <div class="box">
 <h2>Compra</h2>
+
+<div class="flex">
 <input type="date" id="f_fecha">
-<input type="text" id="f_nombre">
-<input type="number" id="f_total">
-<input type="number" id="f_cant">
-<select id="f_unid"><option value="kg">kg</option><option value="un">un</option></select>
-<button onclick="registrarCompra()">OK</button>
+<input type="text" id="f_nombre" placeholder="Insumo">
+</div>
+
+<div class="flex">
+<input type="number" id="f_total" placeholder="Total $">
+<input type="number" id="f_cant" placeholder="Cantidad">
+<select id="f_unid">
+<option value="kg">kg</option>
+<option value="un">un</option>
+<option value="lts">lts</option>
+</select>
+</div>
+
+<button onclick="registrarCompra()">Registrar compra</button>
 
 <table>
 <thead><tr><th>Fecha</th><th>Insumo</th><th>Cant</th><th>$</th><th></th></tr></thead>
@@ -36,9 +110,16 @@ th, td { padding: 10px; border-bottom: 1px solid #ddd; }
 
 <div class="box">
 <h2>Gasto</h2>
+
 <select id="sel_insumos"></select>
-<input type="number" id="g_cant">
-<button onclick="registrarGasto()">OK</button>
+<input type="number" id="g_cant" placeholder="Cantidad a gastar">
+
+<button onclick="registrarGasto()">Registrar gasto</button>
+
+<table>
+<thead><tr><th>Insumo</th><th>Cant</th><th></th></tr></thead>
+<tbody id="tabla_gastos"></tbody>
+</table>
 </div>
 
 <div class="box">
@@ -55,14 +136,14 @@ th, td { padding: 10px; border-bottom: 1px solid #ddd; }
 <div>Stock: <b id="r_stock">$0</b></div>
 </div>
 
-<button onclick="reiniciarTodo()" style="background:red;width:100%">RESET</button>
+<button onclick="reiniciarTodo()" class="red">RESET</button>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCDnMHlcO9JME_CBQDrawKGU6t1GIfGKWU",
+  apiKey: "TU_API_KEY",
   authDomain: "insumex-a02f5.firebaseapp.com",
   databaseURL: "https://insumex-a02f5-default-rtdb.firebaseio.com",
   projectId: "insumex-a02f5"
@@ -73,6 +154,7 @@ const db = getDatabase(app);
 
 let compras = [];
 let gastos = [];
+let editandoGasto = null;
 
 window.onload = () => {
     document.getElementById('f_fecha').valueAsDate = new Date();
@@ -82,7 +164,6 @@ window.onload = () => {
 function escuchar() {
     onValue(ref(db), (snap) => {
         const data = snap.val() || {};
-
         compras = [];
         gastos = [];
 
@@ -123,10 +204,49 @@ window.registrarCompra = async () => {
 window.registrarGasto = async () => {
     let nom = sel_insumos.value;
     let can = parseFloat(g_cant.value);
+
     if(!nom || isNaN(can)) return;
+
+    let disponible = calcularDisponible(nom);
+
+    if(editandoGasto){
+        let original = gastos.find(g=>g.id === editandoGasto);
+        if(original) disponible += original.c;
+    }
+
+    if(can > disponible){
+        alert("No hay suficiente stock");
+        return;
+    }
+
+    if(editandoGasto){
+        await remove(ref(db,"gastos/"+editandoGasto));
+        editandoGasto = null;
+    }
 
     await push(ref(db,"gastos"),{n:nom,c:can});
     g_cant.value="";
+};
+
+function calcularDisponible(nombre){
+    let comp = 0;
+    let gast = 0;
+
+    compras.forEach(c=>{
+        if(c.n === nombre) comp += c.c;
+    });
+
+    gastos.forEach(g=>{
+        if(g.n === nombre) gast += g.c;
+    });
+
+    return comp - gast;
+}
+
+window.editarGasto = (g)=>{
+    sel_insumos.value = g.n;
+    g_cant.value = g.c;
+    editandoGasto = g.id;
 };
 
 window.eliminarCompra = (id)=>{
@@ -142,6 +262,7 @@ window.reiniciarTodo = ()=>{
 function render(){
     tabla_compras.innerHTML="";
     tabla_stock.innerHTML="";
+    tabla_gastos.innerHTML="";
     sel_insumos.innerHTML='<option value="">--</option>';
 
     let inv={};
@@ -156,7 +277,7 @@ function render(){
         <td>${c.n}</td>
         <td>${c.c}${c.u}</td>
         <td>$${c.t}</td>
-        <td><button onclick="eliminarCompra('${c.id}')" style="background:red">X</button></td>
+        <td><button class="red" onclick="eliminarCompra('${c.id}')">X</button></td>
         </tr>`;
 
         if(!inv[c.n]) inv[c.n]={comp:0,gast:0,precio:c.precioUnit,med:c.u};
@@ -165,6 +286,13 @@ function render(){
 
     gastos.forEach(g=>{
         if(inv[g.n]) inv[g.n].gast+=g.c;
+
+        tabla_gastos.innerHTML += `
+        <tr>
+        <td>${g.n}</td>
+        <td>${g.c}</td>
+        <td><button onclick='editarGasto(${JSON.stringify(g)})'>Editar</button></td>
+        </tr>`;
     });
 
     Object.keys(inv).forEach(n=>{
@@ -176,6 +304,7 @@ function render(){
         sumS+=val;
 
         sel_insumos.innerHTML+=`<option value="${n}">${n}</option>`;
+
         tabla_stock.innerHTML+=`
         <tr>
         <td>${n}</td>
